@@ -1,7 +1,7 @@
 # zip file for lambda
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_file = "index.py"
+  source_file = "../src/index.py"
   output_path = "lambda.zip"
 }
 
