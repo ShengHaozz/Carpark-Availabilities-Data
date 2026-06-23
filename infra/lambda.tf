@@ -54,7 +54,7 @@ resource "aws_lambda_function" "test_lambda" {
   function_name = "test_lambda"
   role          = aws_iam_role.lambda_role.arn
   runtime       = "python3.14"
-  handler       = "index.main" # main() of index.py
+  handler       = "index.handler" # handler() of index.py
 
   filename         = data.archive_file.lambda_zip.output_path
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
