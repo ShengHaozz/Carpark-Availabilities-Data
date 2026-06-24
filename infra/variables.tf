@@ -15,3 +15,14 @@ variable "secret_key" {
   type        = string
   description = "Secret Key for Terraform IAM User"
 }
+
+variable "datamall_account_key" {
+  type        = string
+  description = "Account Key for LTA DataMall"
+}
+
+variable "bronze_schedule" {
+  type        = string
+  description = "Cron Schedule for bronze ingestion lambda functions"
+  default     = "cron(0/10 * * * ? *)" # every 10 minutes
+}

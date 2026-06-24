@@ -34,8 +34,8 @@ resource "aws_scheduler_schedule" "my_schedule" {
     mode = "OFF"
   }
 
-  # cron or rate expression
-  schedule_expression = "rate(1 hour)" # or "cron(0 9 * * ? *)" for 9am daily
+  # cron expression for every 10 minutes
+  schedule_expression = var.bronze_schedule
 
   target {
     arn      = aws_lambda_function.test_lambda.arn
