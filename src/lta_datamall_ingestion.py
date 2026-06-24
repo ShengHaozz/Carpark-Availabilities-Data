@@ -36,7 +36,7 @@ def handler(event, context):
     )
     s3.put_object(
         Bucket =  BUCKET,
-        key = key,
+        Key = key,
         Body = response_bytes,
         ContentType = "application/json"
     )
