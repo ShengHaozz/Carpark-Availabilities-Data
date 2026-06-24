@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 ACCOUNT_KEY = os.environ["ACCOUNT_KEY"]
 BUCKET = os.environ["BUCKET_NAME"]
 ENDPOINT = "https://datamall2.mytransport.sg/ltaodataservice/CarParkAvailabilityv2"
-PREFIX = "bronze"
-SOURCE = "lta"
+LEVEL = os.environ["LEVEL"]
+SOURCE = os.environ["SOURCE"]
 
 headers = {
     "AccountKey" : ACCOUNT_KEY
@@ -26,8 +26,8 @@ def handler(event, context):
     now = datetime.now(timezone.utc)
     
     key = (
-        f"{PREFIX}/"
-        f"{SOURCE}/"
+        f"level={LEVEL}/"
+        f"source={SOURCE}/"
         f"year={now.year}/"
         f"month={now.month:02d}/"
         f"day={now.day:02d}/"

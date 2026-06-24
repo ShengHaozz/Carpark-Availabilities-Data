@@ -1,4 +1,9 @@
 # zip file for lambda
+locals {
+  source = "lta"
+  level  = "bronze"
+}
+
 data "archive_file" "datamall_lambda_zip" {
   type        = "zip"
   source_file = "../src/lta_datamall_ingestion.py"
@@ -31,13 +36,10 @@ resource "aws_iam_role_policy" "lambda_s3_put_policy" {
     Statement = [{
       Effect = "Allow"
       Action = [
-        "s3:PutObject",
-        "s3:ListBucket"
+        "s3:PutObject"
       ]
       Resource = [
-        aws_s3_bucket.bucket.arn,       # bucket
-        "${aws_s3_bucket.bucket.arn}/*" # everything in the bucket
-        # TODO: make permission narrower to just bronze layer
+        "${aws_s3_bucket.bucket.arn}/level=${local.level}/source=${local.source}/*"
       ]
     }]
   })
@@ -63,6 +65,8 @@ resource "aws_lambda_function" "datamall_ingestion_lambda" {
     variables = {
       BUCKET_NAME = aws_s3_bucket.bucket.id
       ACCOUNT_KEY = var.datamall_account_key
+      LEVEL       = local.level
+      SOURCE      = local.source
     }
   }
 }
