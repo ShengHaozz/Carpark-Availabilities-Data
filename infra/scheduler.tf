@@ -21,7 +21,7 @@ resource "aws_iam_role_policy" "scheduler_lambda_policy" {
     Statement = [{
       Effect   = "Allow"
       Action   = "lambda:InvokeFunction"
-      Resource = aws_lambda_function.test_lambda.arn
+      Resource = aws_lambda_function.datamall_ingestion_lambda.arn
     }]
   })
 }
@@ -38,7 +38,7 @@ resource "aws_scheduler_schedule" "my_schedule" {
   schedule_expression = var.bronze_schedule
 
   target {
-    arn      = aws_lambda_function.test_lambda.arn
+    arn      = aws_lambda_function.datamall_ingestion_lambda.arn
     role_arn = aws_iam_role.scheduler_role.arn
 
     input = jsonencode({
@@ -51,7 +51,7 @@ resource "aws_scheduler_schedule" "my_schedule" {
 resource "aws_lambda_permission" "allow_scheduler" {
   statement_id  = "AllowEventBridgeScheduler"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.test_lambda.function_name
+  function_name = aws_lambda_function.datamall_ingestion_lambda.function_name
   principal     = "scheduler.amazonaws.com"
   source_arn    = aws_scheduler_schedule.my_schedule.arn
 }
