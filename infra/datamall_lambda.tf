@@ -61,6 +61,8 @@ resource "aws_lambda_function" "datamall_ingestion_lambda" {
   filename         = data.archive_file.datamall_lambda_zip.output_path
   source_code_hash = data.archive_file.datamall_lambda_zip.output_base64sha256
 
+  timeout = 30
+
   environment {
     variables = {
       BUCKET_NAME = aws_s3_bucket.bucket.id
