@@ -56,7 +56,7 @@ resource "aws_lambda_function" "datamall_ingestion_lambda" {
   function_name = "datamall_ingestion_lambda"
   role          = aws_iam_role.datamall_ingestion_lambda_role.arn
   runtime       = "python3.14"
-  handler       = "index.handler" # handler() of index.py
+  handler       = "lta_datamall_ingestion.handler" # handler() of index.py
 
   filename         = data.archive_file.datamall_lambda_zip.output_path
   source_code_hash = data.archive_file.datamall_lambda_zip.output_base64sha256
