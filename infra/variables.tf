@@ -3,7 +3,7 @@ variable "aws_region" {
 }
 
 variable "bucket_name" {
-  default = "shenghao-car-availability-bucket"
+  default = "shenghao-carpark-availability-bucket"
 }
 
 variable "access_key" {
