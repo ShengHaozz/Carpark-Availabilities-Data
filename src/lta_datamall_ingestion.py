@@ -39,6 +39,7 @@ def handler(event, context):
             f"month={now.month:02d}/"
             f"day={now.day:02d}/"
             f"hour={now.hour:02d}/"
+            f"minute={((now.minute // 10) * 10):02d}" # floor to 10s
             f"data_skip_{(i * 500):04d}.json"
         )
         try: 
