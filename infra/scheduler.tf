@@ -40,10 +40,6 @@ resource "aws_scheduler_schedule" "my_schedule" {
   target {
     arn      = aws_lambda_function.datamall_ingestion_lambda.arn
     role_arn = aws_iam_role.scheduler_role.arn
-
-    input = jsonencode({
-      source = "eventbridge-scheduler"
-    })
   }
 }
 
