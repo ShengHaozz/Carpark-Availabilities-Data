@@ -1,13 +1,13 @@
 # zip file for lambda
 locals {
-  source = "lta"
-  level  = "bronze"
+  lta_source = "lta"
+  lta_level  = "bronze"
 }
 
 data "archive_file" "datamall_lambda_zip" {
   type        = "zip"
-  source_file = "../src/lta_datamall_ingestion.py"
-  output_path = "datamall_lambda.zip"
+  source_file = "${path.root}/../src/lta_datamall_ingestion.py"
+  output_path = "${path.module}/datamall_lambda.zip"
 }
 
 # allow lambda to assume this role
@@ -27,7 +27,7 @@ resource "aws_iam_role" "datamall_ingestion_lambda_role" {
 }
 
 # attach this policy onto lambda_role
-resource "aws_iam_role_policy" "lambda_s3_put_policy" {
+resource "aws_iam_role_policy" "lta_lambda_s3_put_policy" {
   name = "lambda-s3-put"
   role = aws_iam_role.datamall_ingestion_lambda_role.name
 
@@ -39,14 +39,14 @@ resource "aws_iam_role_policy" "lambda_s3_put_policy" {
         "s3:PutObject"
       ]
       Resource = [
-        "${aws_s3_bucket.bucket.arn}/level=${local.level}/source=${local.source}/*"
+        "${var.s3_bucket.arn}/level=${local.lta_level}/source=${local.lta_source}/*"
       ]
     }]
   })
 }
 
 # CloudWatch Logs Permission
-resource "aws_iam_role_policy_attachment" "lambda_logs" {
+resource "aws_iam_role_policy_attachment" "lta_datamall_lambda_logs" {
   role       = aws_iam_role.datamall_ingestion_lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
@@ -65,10 +65,10 @@ resource "aws_lambda_function" "datamall_ingestion_lambda" {
 
   environment {
     variables = {
-      BUCKET_NAME = aws_s3_bucket.bucket.id
+      BUCKET_NAME = var.s3_bucket.id
       ACCOUNT_KEY = var.datamall_account_key
-      LEVEL       = local.level
-      SOURCE      = local.source
+      LEVEL       = local.lta_level
+      SOURCE      = local.lta_source
     }
   }
 }

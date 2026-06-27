@@ -19,15 +19,20 @@ resource "aws_iam_role_policy" "scheduler_lambda_policy" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = "lambda:InvokeFunction"
-      Resource = aws_lambda_function.datamall_ingestion_lambda.arn
+      Effect = "Allow"
+      Action = "lambda:InvokeFunction"
+      Resource = [
+        module.lambda.functions.lta_datamall.arn,
+        module.lambda.functions.hdb_data.arn
+      ]
+
     }]
   })
 }
 
-resource "aws_scheduler_schedule" "my_schedule" {
-  name = "my-lambda-schedule"
+resource "aws_scheduler_schedule" "bronze_schedule" {
+  for_each = module.lambda.functions
+  name     = "${each.key}_bronze_schedule"
 
   # flexible or exact time
   flexible_time_window {
@@ -38,17 +43,19 @@ resource "aws_scheduler_schedule" "my_schedule" {
   schedule_expression = var.bronze_schedule
 
   target {
-    arn      = aws_lambda_function.datamall_ingestion_lambda.arn
+    arn      = each.value.arn
     role_arn = aws_iam_role.scheduler_role.arn
   }
 }
 
 # Resource-based permission for EventBridge to invoke Lambda
 resource "aws_lambda_permission" "allow_scheduler" {
+  for_each = module.lambda.functions
+
   statement_id  = "AllowEventBridgeScheduler"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.datamall_ingestion_lambda.function_name
+  function_name = each.value.function_name
   principal     = "scheduler.amazonaws.com"
-  source_arn    = aws_scheduler_schedule.my_schedule.arn
+  source_arn    = aws_scheduler_schedule.bronze_schedule[each.key].arn
 }
 
