@@ -6,7 +6,7 @@ locals {
 
 data "archive_file" "hdb_data_zip" {
   type        = "zip"
-  source_file = "${path.root}/../src/index.py"
+  source_file = "${path.root}/../src/hdb_data_ingestion.py"
   output_path = "${path.module}/hdb_data.zip"
 }
 
@@ -56,7 +56,7 @@ resource "aws_lambda_function" "hdb_data_ingestion" {
   function_name = "hdb_data_ingestion"
   role          = aws_iam_role.hdb_data_ingestion_lambda_role.arn
   runtime       = "python3.14"
-  handler       = "lta_datamall_ingestion.handler" # handler() of index.py
+  handler       = "hdb_data_ingestion.handler" # handler() of index.py
 
   filename         = data.archive_file.hdb_data_zip.output_path
   source_code_hash = data.archive_file.hdb_data_zip.output_base64sha256

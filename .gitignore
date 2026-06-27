@@ -263,4 +263,4 @@ crash.*.log
 # planout
 
 # zip files for lambda functions
-infra/*.zip
+infra/**/*.zip
