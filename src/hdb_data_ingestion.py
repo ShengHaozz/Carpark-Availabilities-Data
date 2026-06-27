@@ -35,7 +35,8 @@ def handler(event, context):
             )
             with urllib.request.urlopen(req) as response:
                 raw_response = response.read()
-        
+                
+            break
         except HTTPError as e:
             print(f"HTTP {e.code}: {e.reason}")
             
