@@ -56,7 +56,7 @@ resource "aws_lambda_function" "hdb_data_ingestion" {
   function_name = "hdb_data_ingestion"
   role          = aws_iam_role.hdb_data_ingestion_lambda_role.arn
   runtime       = "python3.14"
-  handler       = "hdb_data_ingestion.handler" # handler() of index.py
+  handler       = "handler.handler" # handler() of index.py
 
   filename         = data.archive_file.hdb_data_zip.output_path
   source_code_hash = data.archive_file.hdb_data_zip.output_base64sha256
