@@ -6,7 +6,7 @@ locals {
 
 data "archive_file" "hdb_data_zip" {
   type        = "zip"
-  source_file = "${path.root}/../src/hdb_data_ingestion.py"
+  source_file = "${path.root}/../packages/hdb_poller/src/hdb_poller/handler.py"
   output_path = "${path.module}/hdb_data.zip"
 }
 

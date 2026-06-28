@@ -6,7 +6,7 @@ locals {
 
 data "archive_file" "datamall_lambda_zip" {
   type        = "zip"
-  source_file = "${path.root}/../src/lta_datamall_ingestion.py"
+  source_file = "${path.root}/../packages/lta_poller/src/lta_poller/handler.py"
   output_path = "${path.module}/datamall_lambda.zip"
 }
 
