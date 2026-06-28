@@ -35,7 +35,7 @@ def handler(event, context):
 
         try:  
             req = urllib.request.Request(
-                ENDPOINT.format(page * 500), # skip in units of 500
+                ENDPOINT.format((page -1) * 500), # skip in units of 500
                 headers = headers
             )
             with urllib.request.urlopen(req) as response:
