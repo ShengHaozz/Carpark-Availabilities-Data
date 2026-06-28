@@ -28,6 +28,6 @@ PKey: (carpark_id, ingestion_timestamp)
 | location_long | float | Yes | lta | from location |
 | area | string | Yes | lta | |
 | development | string | Yes | lta | |
-| agency | string | Yes | lta | 'LTA' / 'URA' / 'HDB' |
+| agency | string | No | lta | 'LTA' / 'URA' / 'HDB' |
 | ingestion_timestamp | utc timestamp | No | derived | when this row was written | 
-| source_file | string | No | derived | S3 path for lineage |
+| source_filepath | string | No | derived | S3 path for lineage |
