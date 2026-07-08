@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Literal
 from datetime import datetime
-
+import pyarrow as pa
 
 class DatamallCarparkAvailability(BaseModel):
     CarParkID: str
@@ -11,6 +11,21 @@ class DatamallCarparkAvailability(BaseModel):
     AvailableLots: int = Field(ge = 0)
     LotType: Literal['C', 'H', 'Y']
     Agency: Literal['HDB', 'LTA', 'URA']
+
+    @property
+    def LocationLatLong(self) -> tuple[float | None, float | None]:
+        return self._parse_location()
+
+    def _parse_location(self) -> tuple[float | None, float | None]:
+        try:
+            parts = self.Location.split()
+            if len(parts) != 2:
+                print(f"Could not parse Location {self.Location} for CarparkID {self.CarParkID}")
+                return None, None
+            return float(parts[0]), float(parts[1])
+        except Exception as e:
+            print(f"Could not parse Location {self.Location} for CarparkID {self.CarParkID}")
+            return None, None
 
 class HDBCarparkInfo(BaseModel):
     lots_available: int = Field(ge = 0)
@@ -37,3 +52,17 @@ class SilverColdCarparkSnapshot(BaseModel):
     ingestion_timestamp: datetime
     source_filepath: str
 
+SILVER_PARQUET_SCHEAM = pa.schema([
+    pa.field("carpark_id", pa.string(), nullable=False),
+    pa.field("snapshot_timestamp", pa.timestamp("us", tz="UTC"), nullable=False),
+    pa.field("lot_type", pa.string(), nullable=False),
+    pa.field("lots_available", pa.int32(), nullable=False),
+    pa.field("total_lots", pa.int32(), nullable=True),
+    pa.field("location_latitude", pa.float64(), nullable=True),
+    pa.field("location_longitude", pa.float64(), nullable=True),
+    pa.field("area", pa.string(), nullable=True),
+    pa.field("development", pa.string(), nullable=True),
+    pa.field("agency", pa.string(), nullable=True),
+    pa.field("ingestion_timestamp", pa.timestamp("us", tz="UTC"), nullable=False),
+    pa.field("source_filepath", pa.string(), nullable=False),
+])
