@@ -38,7 +38,7 @@ class DatamallCarparkAvailability(BaseModel):
 
 class HDBCarparkInfo(BaseModel):
     lots_available: int = Field(ge = 0)
-    lot_type: str = Literal['C', 'H', 'S', 'Y']
+    lot_type: Literal['C', 'H', 'S', 'Y', 'unknown'] = 'unknown'
     total_lots: int = Field(ge = 0)
 
 class HDBCarparkData(BaseModel) :
@@ -50,7 +50,7 @@ class HDBCarparkData(BaseModel) :
 class SilverColdCarparkSnapshot(BaseModel):
     carpark_id: str
     snapshot_timestamp: datetime
-    lot_type: str = Literal['C', 'H', 'S', 'Y', 'unknown']
+    lot_type: Literal['C', 'H', 'S', 'Y', 'unknown']
     lots_available: int = Field(ge = 0)
     total_lots: int | None = Field(default = None, ge = 0)
     location_latitude: float | None = None
@@ -61,7 +61,7 @@ class SilverColdCarparkSnapshot(BaseModel):
     ingestion_timestamp: datetime
     source_filepath: str
 
-SILVER_PARQUET_SCHEAM = pa.schema([
+SILVER_PARQUET_SCHEMA = pa.schema([
     pa.field("carpark_id", pa.string(), nullable=False),
     pa.field("snapshot_timestamp", pa.timestamp("us", tz="UTC"), nullable=False),
     pa.field("lot_type", pa.string(), nullable=False),
