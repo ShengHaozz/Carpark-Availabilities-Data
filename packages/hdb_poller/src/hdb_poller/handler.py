@@ -1,3 +1,5 @@
+import json
+
 import boto3
 import urllib.request
 from urllib.error import HTTPError
@@ -34,8 +36,10 @@ def handler(event, context):
                 ENDPOINT
             )
             with urllib.request.urlopen(req) as response:
-                raw_response = response.read()
-                
+                data = json.loads(response.read())
+            
+            values = data.get("items", [{}])[0].get("carpark_data", [])
+
             break
         except HTTPError as e:
             print(f"HTTP {e.code}: {e.reason}")
@@ -58,7 +62,7 @@ def handler(event, context):
             tries += 1
             continue
     
-    poll_start = datetime.now(timezone.utc)
+    poll_end = datetime.now(timezone.utc)
 
 
     
@@ -78,11 +82,21 @@ def handler(event, context):
         f"snapshot_{ref_date.isoformat()}.json"
     )
 
+    snapshot = {
+        "datetime" : ref_date.isoformat(),
+        "source" : SOURCE,
+        "poll_start" : poll_start.isoformat(),
+        "poll_end" : poll_end.isoformat(),
+        "pages" : 1,
+        "records_count" : len(values),
+        "value" : values
+    }
+
     try: 
         s3.put_object(
             Bucket =  BUCKET,
             Key = key,
-            Body = raw_response,
+            Body = json.dumps(snapshot),
             ContentType = "application/json"
         )
         print(f"Uploaded {key}")
