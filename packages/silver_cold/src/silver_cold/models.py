@@ -4,7 +4,6 @@ from datetime import datetime
 import pyarrow as pa
 
 class DatamallCarparkAvailability(BaseModel):
-    snapshot_timestamp: datetime
     CarParkID: str
     Area: str | None = None
     Development: str | None = None
@@ -34,7 +33,6 @@ class HDBCarparkInfo(BaseModel):
     total_lots: int = Field(ge = 0)
 
 class HDBCarparkData(BaseModel) :
-    snapshot_timestamp: datetime
     carpark_info: HDBCarparkInfo
     carpark_number: str
     update_datetime: str
