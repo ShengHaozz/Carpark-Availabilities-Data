@@ -41,7 +41,7 @@ class HDBCarparkData(BaseModel) :
 class SilverColdCarparkSnapshot(BaseModel):
     carpark_id: str
     snapshot_timestamp: datetime
-    lot_type: str = Literal['C', 'H', 'Y', 'unknown']
+    lot_type: str = Literal['C', 'H', 'S', 'Y', 'unknown']
     lots_available: int = Field(ge = 0)
     total_lots: int | None = Field(default = None, ge = 0)
     location_latitude: float | None = None
