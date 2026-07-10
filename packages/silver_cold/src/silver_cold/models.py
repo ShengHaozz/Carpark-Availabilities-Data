@@ -3,6 +3,15 @@ from typing import Literal
 from datetime import datetime
 import pyarrow as pa
 
+class BronzeSnapshot[T](BaseModel):
+    timestamp: datetime
+    source: str
+    poll_start: datetime
+    poll_end: datetime
+    pages: int
+    records_count: int
+    values: list[T]
+
 class DatamallCarparkAvailability(BaseModel):
     CarParkID: str
     Area: str | None = None
@@ -48,7 +57,7 @@ class SilverColdCarparkSnapshot(BaseModel):
     location_longitude: float | None = None
     area: str | None = None
     development: str | None = None
-    Agency: Literal['HDB', 'LTA', 'URA']
+    agency: Literal['HDB', 'LTA', 'URA']
     ingestion_timestamp: datetime
     source_filepath: str
 
@@ -62,7 +71,7 @@ SILVER_PARQUET_SCHEAM = pa.schema([
     pa.field("location_longitude", pa.float64(), nullable=True),
     pa.field("area", pa.string(), nullable=True),
     pa.field("development", pa.string(), nullable=True),
-    pa.field("agency", pa.string(), nullable=True),
+    pa.field("agency", pa.string(), nullable=False),
     pa.field("ingestion_timestamp", pa.timestamp("us", tz="UTC"), nullable=False),
     pa.field("source_filepath", pa.string(), nullable=False),
 ])
