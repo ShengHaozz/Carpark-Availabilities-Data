@@ -160,24 +160,28 @@ def handler(event, context):
 
     hdb_adapter = TypeAdapter(BronzeSnapshot[HDBCarparkData])
 
+    print(f"Fetching LTA snapshots from s3://{BUCKET}/{lta_key_prefix}")
     lta_snapshots = get_snapshots_from_bucket(
         paginator = paginator,
         prefix = lta_key_prefix,
         validator = lta_adapter.validate_python
     )
 
+    print(f"Fetching HDB snapshots from s3://{BUCKET}/{hdb_key_prefix}")
     hdb_snapshots = get_snapshots_from_bucket(
         paginator = paginator,
         prefix = hdb_key_prefix,
         validator = hdb_adapter.validate_python
     )
 
+    print("Transforming snapshots into silver table")
     silver_table = transform(
         lta_snapshots = lta_snapshots,
         hdb_snapshots = hdb_snapshots,
         ingestion_timestamp = ingestion_timestamp
     )
 
+    print("Uploading silver table to S3")
     upload_silver_table_to_s3(
         silver_table = silver_table,
         ingestion_timestamp = ingestion_timestamp
