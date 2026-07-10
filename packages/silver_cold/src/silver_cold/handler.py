@@ -1,9 +1,9 @@
 import boto3
-from models import SILVER_PARQUET_SCHEMA, BronzeSnapshot, DatamallCarparkAvailability, HDBCarparkData, SilverColdCarparkSnapshot
+from models import SILVER_PARQUET_SCHEMA, BronzeSnapshot, DatamallCarparkAvailability, HDBCarparkData
 import os
 import json
 from typing import Callable
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import TypeAdapter
 import pyarrow as pa
 
@@ -21,7 +21,7 @@ KEY_PREFIX = (
     "day={day:02d}/"
 )
 
-ingestion_timestamp = datetime.now()
+ingestion_timestamp = datetime.now(tz = timezone.utc)
 
 def get_snapshots_from_bucket[T](
         paginator,
@@ -108,6 +108,26 @@ def transform(
     silver_table = pa.Table.from_pylist(silver_data, schema = SILVER_PARQUET_SCHEMA)
     return silver_table
 
+def upload_silver_table_to_s3(
+        silver_table: pa.Table,
+        ingestion_timestamp: datetime,
+        bucket: str = BUCKET,
+        level: str = OUTPUT_LEVEL
+    ) -> None:
+
+    key = (
+        f"level={level}/"
+        f"year={ingestion_timestamp.year}/"
+        f"month={ingestion_timestamp.month:02d}/"
+        f"day={ingestion_timestamp.day:02d}/"
+        f"silver_cold.parquet"
+    )
+
+    s3fs = pa.fs.S3FileSystem()
+    with s3fs.open_output_stream(f"{bucket}/{key}") as stream:
+        pa.pq.write_table(silver_table, stream, compression = "zstd")
+
+    print(f"Uploaded {key}")
 """
 event = {
     year: int,
@@ -155,5 +175,10 @@ def handler(event, context):
     silver_table = transform(
         lta_snapshots = lta_snapshots,
         hdb_snapshots = hdb_snapshots,
+        ingestion_timestamp = ingestion_timestamp
+    )
+
+    upload_silver_table_to_s3(
+        silver_table = silver_table,
         ingestion_timestamp = ingestion_timestamp
     )
