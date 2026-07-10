@@ -1,8 +1,8 @@
 import boto3
-from models import SILVER_PARQUET_SCHEMA, BronzeSnapshot, DatamallCarparkAvailability, HDBCarparkData
+from .models import SILVER_PARQUET_SCHEMA, BronzeSnapshot, DatamallCarparkAvailability, HDBCarparkData
 import os
 import json
-from typing import Callable
+from typing import Callable, Any
 from datetime import datetime, timezone
 from pydantic import TypeAdapter
 import pyarrow as pa
@@ -24,7 +24,7 @@ KEY_PREFIX = (
 ingestion_timestamp = datetime.now(tz = timezone.utc)
 
 def get_snapshots_from_bucket[T](
-        paginator,
+        s3_client: Any,
         prefix: str, 
         validator: Callable[[dict], T],
         bucket: str = BUCKET
@@ -32,14 +32,14 @@ def get_snapshots_from_bucket[T](
 
     snapshots: list[T] = []
 
-    for page in paginator.paginate(Bucket = bucket, Prefix = prefix): # Each folder
+    for page in s3_client.get_paginator('list_objects_v2').paginate(Bucket = bucket, Prefix = prefix): # Each folder
         for obj in page.get("Content", []): # Each file in the folder
             filepath_str = obj["Key"] 
 
             if filepath_str.endswith('/'): # placeholder directories
                 continue
             
-            response = s3.get_object(
+            response = s3_client.get_object(
                 Bucket = bucket,
                 Key = filepath_str
             )
@@ -138,7 +138,6 @@ event = {
 
 def handler(event, context):
     s3 = boto3.client('s3')
-    paginator = s3.get_paginator('list_objects_v2')
 
     lta_key_prefix = KEY_PREFIX.format(
         level = INPUT_LEVEL,
@@ -162,14 +161,14 @@ def handler(event, context):
 
     print(f"Fetching LTA snapshots from s3://{BUCKET}/{lta_key_prefix}")
     lta_snapshots = get_snapshots_from_bucket(
-        paginator = paginator,
+        s3_client = s3,
         prefix = lta_key_prefix,
         validator = lta_adapter.validate_python
     )
 
     print(f"Fetching HDB snapshots from s3://{BUCKET}/{hdb_key_prefix}")
     hdb_snapshots = get_snapshots_from_bucket(
-        paginator = paginator,
+        s3_client = s3,
         prefix = hdb_key_prefix,
         validator = hdb_adapter.validate_python
     )

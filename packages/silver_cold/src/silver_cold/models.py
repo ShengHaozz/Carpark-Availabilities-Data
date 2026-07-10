@@ -1,3 +1,5 @@
+import traceback
+
 from pydantic import BaseModel, Field
 from typing import Literal
 from datetime import datetime
@@ -34,6 +36,8 @@ class DatamallCarparkAvailability(BaseModel):
             return float(parts[0]), float(parts[1])
         except Exception as e:
             print(f"Could not parse Location {self.Location} for CarparkID {self.CarParkID}")
+            print(f"Exception: {e}")
+            traceback.print_exc()
             return None, None
 
 class HDBCarparkInfo(BaseModel):
