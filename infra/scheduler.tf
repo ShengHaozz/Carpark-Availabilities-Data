@@ -22,8 +22,8 @@ resource "aws_iam_role_policy" "scheduler_lambda_policy" {
       Effect = "Allow"
       Action = "lambda:InvokeFunction"
       Resource = [
-        module.lambda.functions.lta_datamall.arn,
-        module.lambda.functions.hdb_data.arn
+        module.bronze_lambda.functions.lta_datamall.arn,
+        module.bronze_lambda.functions.hdb_data.arn
       ]
 
     }]
@@ -31,7 +31,7 @@ resource "aws_iam_role_policy" "scheduler_lambda_policy" {
 }
 
 resource "aws_scheduler_schedule" "bronze_schedule" {
-  for_each = module.lambda.functions
+  for_each = module.bronze_lambda.functions
   name     = "${each.key}_bronze_schedule"
 
   # flexible or exact time
@@ -50,7 +50,7 @@ resource "aws_scheduler_schedule" "bronze_schedule" {
 
 # Resource-based permission for EventBridge to invoke Lambda
 resource "aws_lambda_permission" "allow_scheduler" {
-  for_each = module.lambda.functions
+  for_each = module.bronze_lambda.functions
 
   statement_id  = "AllowEventBridgeScheduler"
   action        = "lambda:InvokeFunction"
