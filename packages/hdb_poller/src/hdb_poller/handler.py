@@ -83,7 +83,7 @@ def handler(event, context):
     )
 
     snapshot = {
-        "datetime" : ref_date.isoformat(),
+        "timestamp" : ref_date.isoformat(),
         "source" : SOURCE,
         "poll_start" : poll_start.isoformat(),
         "poll_end" : poll_end.isoformat(),
