@@ -26,3 +26,8 @@ variable "bronze_schedule" {
   description = "Cron Schedule for bronze ingestion lambda functions"
   default     = "cron(0/10 * * * ? *)" # every 10 minutes
 }
+
+variable "silver_cold_image_digest" {
+  type        = string
+  description = "Image digest for the silver cold lambda function, filled at runtime"
+}

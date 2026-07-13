@@ -1,5 +1,12 @@
 module "bronze_lambda" {
-  source               = "./lambda"
+  source               = "./bronze_lambda"
   s3_bucket            = aws_s3_bucket.bucket
   datamall_account_key = var.datamall_account_key
+}
+
+module "silver_lambda" {
+  source       = "./silver_lambda"
+  s3_bucket    = aws_s3_bucket.bucket
+  image_digest = var.image_digest
+  repo_url     = var.repo_url
 }
