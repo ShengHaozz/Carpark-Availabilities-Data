@@ -66,7 +66,7 @@ resource "aws_lambda_function" "silver_cold_lambda" {
   package_type  = "Image"
   image_uri     = "${var.repo_url}@${var.image_digest}"
 
-  architectures = ["x86_64"]
+  architectures = ["arm64"]
   memory_size   = 512
   timeout       = 30
 
