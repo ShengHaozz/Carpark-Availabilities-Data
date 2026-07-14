@@ -7,6 +7,6 @@ module "bronze_lambda" {
 module "silver_lambda" {
   source       = "./silver_lambda"
   s3_bucket    = aws_s3_bucket.bucket
-  image_digest = var.image_digest
-  repo_url     = var.repo_url
+  image_digest = var.silver_cold_image_digest
+  repo_url     = aws_ecr_lifecycle_policy.lambda_repo_policy.repository_url
 }
