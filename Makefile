@@ -2,19 +2,55 @@
 include .env
 export
 
-AWS_REGION ?= ap-southeast-1 # set if not already set
+BOOTSTRAP_PROFILE ?= bootstrap
+ECR_BUILDER_PROFILE ?= ecr-builder
+APP_BUILDER_PROFILE ?= app-builder
+
+AWS_REGION ?= ap-southeast-1
 REPO_URL   ?= $(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO_NAME)
 WORKSPACE  := $(shell pwd)
 FUNCS      := silver_cold # func1 func2
 
-.PHONY: bootstrap_ecr login build push digests apply deploy
+.PHONY: profile bootstrap_ecr login build push digests apply deploy
 
-bootstrap_ecr: # create ecr
-	cd infra && terraform apply -target=aws_ecr_repository.lambda_repo -auto-approve
+terraform_init:
+	terraform -chdir=infra/app init
+	terraform -chdir=infra/bootstrap init
+	terraform -chdir=infra/ecr init
+
+profile: terraform_init
+	@test -n "$(TF_VAR_ACCESS_KEY)" || (echo "TF_VAR_ACCESS_KEY is not set" && exit 1)
+	@test -n "$(TF_VAR_SECRET_KEY)" || (echo "TF_VAR_SECRET_KEY is not set" && exit 1)
+
+	@echo "Making bootstrap profile"
+	@aws configure set aws_access_key_id "$(TF_VAR_ACCESS_KEY)" --profile "$(BOOTSTRAP_PROFILE)"
+	@aws configure set aws_secret_access_key "$(TF_VAR_SECRET_KEY)" --profile "$(BOOTSTRAP_PROFILE)"
+	@aws configure set region "$(AWS_REGION)" --profile "$(BOOTSTRAP_PROFILE)"
+	@echo "AWS profile '$(BOOTSTRAP_PROFILE)' configured"
+
+	AWS_PROFILE=$(BOOTSTRAP_PROFILE) \
+	terraform -chdir=infra/bootstrap apply -auto-approve
+
+bootstrap: profile # create ecr
+	@echo "Making required roles"
+
+	AWS_PROFILE=$(BOOTSTRAP_PROFILE) \
+	terraform -chdir=infra/bootstrap apply -auto-approve
+
+	@echo "Making ecr-builder profile"
+	@aws configure set role_arn "$(terraform -chdir=infra/bootstrap output -raw ecr_builder_role_arn)" --profile "$(ECR_BUILDER_PROFILE)"
+	@aws configure set source_profile "$(BOOTSTRAP_PROFILE)" --profile "$(ECR_BUILDER_PROFILE)"
+	@aws configure set region "$(AWS_REGION)" --profile "$(ECR_BUILDER_PROFILE)"
+	@echo "AWS profile '$(ECR_BUILDER_PROFILE)' configured"
+
+	@echo "Making app-builder profile"
+	@aws configure set role_arn "$(terraform -chdir=infra/bootstrap output -raw app_builder_role_arn)" --profile "$(APP_BUILDER_PROFILE)"
+	@aws configure set source_profile "$(BOOTSTRAP_PROFILE)" --profile "$(APP_BUILDER_PROFILE)"
+	@aws configure set region "$(AWS_REGION)" --profile "$(APP_BUILDER_PROFILE)"
+	@echo "AWS profile '$(APP_BUILDER_PROFILE)' configured"
 
 login:
-	AWS_ACCESS_KEY_ID=$(ECR_BUILDER_ACCESS_KEY) \
-	AWS_SECRET_ACCESS_KEY=$(ECR_BUILDER_SECRET_KEY) \
+	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
 	aws ecr get-login-password --region $(AWS_REGION) \
 		| docker login --username AWS --password-stdin $(REPO_URL)
 
