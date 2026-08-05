@@ -1,5 +1,5 @@
 resource "aws_ecr_repository" "lambda_repo" {
-  name                 = "car_availabilities_repo"
+  name                 = var.ecr_repo_name
   image_tag_mutability = "MUTABLE"
   force_delete         = true
 
