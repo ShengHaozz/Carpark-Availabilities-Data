@@ -11,8 +11,8 @@ data "archive_file" "datamall_lambda_zip" {
 }
 
 # allow lambda to assume this role
-resource "aws_iam_role" "datamall_ingestion_lambda_role" {
-  name = "datamall_ingestion_lambda_role"
+resource "aws_iam_role" "lambda_role_datamall_ingestion" {
+  name = "lambda_role_datamall_ingestion"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -29,7 +29,7 @@ resource "aws_iam_role" "datamall_ingestion_lambda_role" {
 # attach this policy onto lambda_role
 resource "aws_iam_role_policy" "lta_lambda_s3_put_policy" {
   name = "lambda-s3-put"
-  role = aws_iam_role.datamall_ingestion_lambda_role.name
+  role = aws_iam_role.lambda_role_datamall_ingestion.name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -47,14 +47,14 @@ resource "aws_iam_role_policy" "lta_lambda_s3_put_policy" {
 
 # CloudWatch Logs Permission
 resource "aws_iam_role_policy_attachment" "lta_datamall_lambda_logs" {
-  role       = aws_iam_role.datamall_ingestion_lambda_role.name
+  role       = aws_iam_role.lambda_role_datamall_ingestion.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 # Lambda Function
 resource "aws_lambda_function" "datamall_ingestion_lambda" {
   function_name = "datamall_ingestion_lambda"
-  role          = aws_iam_role.datamall_ingestion_lambda_role.arn
+  role          = aws_iam_role.lambda_role_datamall_ingestion.arn
   runtime       = "python3.14"
   handler       = "handler.handler" # handler() of index.py
 

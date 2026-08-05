@@ -6,8 +6,8 @@ locals {
   output_level = "silver"
 }
 
-resource "aws_iam_role" "silver_cold_lambda_role" {
-  name = "silver_cold_lambda_role"
+resource "aws_iam_role" "lambda_role_silver_cold" {
+  name = "lambda_role_silver_cold"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -24,7 +24,7 @@ resource "aws_iam_role" "silver_cold_lambda_role" {
 # attach this policy onto lambda_role
 resource "aws_iam_role_policy" "silver_cold_s3_policy" {
   name = "lambda-s3-put"
-  role = aws_iam_role.silver_cold_lambda_role.name
+  role = aws_iam_role.lambda_role_silver_cold.name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -55,14 +55,14 @@ resource "aws_iam_role_policy" "silver_cold_s3_policy" {
 
 # CloudWatch Logs Permission
 resource "aws_iam_role_policy_attachment" "silver_cold_lambda_logs" {
-  role       = aws_iam_role.silver_cold_lambda_role.name
+  role       = aws_iam_role.lambda_role_silver_cold.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 # Lambda Function
 resource "aws_lambda_function" "silver_cold_lambda" {
   function_name = "silver_cold_lambda"
-  role          = aws_iam_role.silver_cold_lambda_role.arn
+  role          = aws_iam_role.lambda_role_silver_cold.arn
   package_type  = "Image"
   image_uri     = "${var.repo_url}@${var.image_digest}"
 

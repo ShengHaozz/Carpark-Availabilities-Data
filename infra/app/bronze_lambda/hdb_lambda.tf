@@ -11,8 +11,8 @@ data "archive_file" "hdb_data_zip" {
 }
 
 # allow lambda to assume this role
-resource "aws_iam_role" "hdb_data_ingestion_lambda_role" {
-  name = "hdb_data_ingestion_lambda_role"
+resource "aws_iam_role" "lambda_role_hdb_data_ingestion" {
+  name = "lambda_role_hdb_data_ingestion"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -29,7 +29,7 @@ resource "aws_iam_role" "hdb_data_ingestion_lambda_role" {
 # attach this policy onto lambda_role
 resource "aws_iam_role_policy" "hdb_lambda_s3_put_policy" {
   name = "lambda-s3-put"
-  role = aws_iam_role.hdb_data_ingestion_lambda_role.name
+  role = aws_iam_role.lambda_role_hdb_data_ingestion.name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -47,14 +47,14 @@ resource "aws_iam_role_policy" "hdb_lambda_s3_put_policy" {
 
 # CloudWatch Logs Permission
 resource "aws_iam_role_policy_attachment" "hdb_data_lambda_logs" {
-  role       = aws_iam_role.hdb_data_ingestion_lambda_role.name
+  role       = aws_iam_role.lambda_role_hdb_data_ingestion.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 # Lambda Function
 resource "aws_lambda_function" "hdb_data_ingestion" {
   function_name = "hdb_data_ingestion"
-  role          = aws_iam_role.hdb_data_ingestion_lambda_role.arn
+  role          = aws_iam_role.lambda_role_hdb_data_ingestion.arn
   runtime       = "python3.14"
   handler       = "handler.handler" # handler() of index.py
 
