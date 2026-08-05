@@ -15,7 +15,7 @@ resource "aws_ecr_lifecycle_policy" "lambda_repo_policy" {
     rules = [
       {
         rulePriority = 1
-        description  = "Expire untagged images after 30 days"
+        description  = "Expire untagged images after 30 days" # new image causes old images to be untagged and cleaned up
         selection = {
           tagStatus   = "untagged"
           countType   = "sinceImagePushed"

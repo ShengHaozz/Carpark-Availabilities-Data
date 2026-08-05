@@ -264,3 +264,6 @@ crash.*.log
 
 # zip files for lambda functions
 infra/**/*.zip
+
+# temp folder
+tmp/*
