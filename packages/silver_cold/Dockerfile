@@ -12,7 +12,7 @@ RUN uv build --package silver_cold -o dist
 RUN uv pip install --system -no-cache-dir dist/silver_cold-*.whl --target /asset
 
 # -- copy to lambda --
-FROm public.ecr.aws/lambda/python:3.14
+FROM public.ecr.aws/lambda/python:3.14
 
 COPY --from=build /asset ${LAMBDA_TASK_ROOT}
 
