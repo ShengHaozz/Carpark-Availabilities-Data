@@ -11,7 +11,7 @@ variable "datamall_account_key" {
   description = "Account Key for LTA DataMall"
 }
 
-variable "bronze_schedule" {
+variable "schedule_10m" {
   type        = string
   description = "Cron Schedule for bronze ingestion lambda functions"
   default     = "cron(0/10 * * * ? *)" # every 10 minutes

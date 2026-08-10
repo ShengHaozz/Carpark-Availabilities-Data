@@ -1,5 +1,13 @@
+locals {
+  scheduler_10m_name = "scheduler_10m"
+}
+
+resource "aws_cloudwatch_event_bus" "main" {
+  name = "carpark-events"
+}
+
 resource "aws_iam_role" "scheduler_role" {
-  name = "my-scheduler-role"
+  name = "carpark-scheduler-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -12,27 +20,22 @@ resource "aws_iam_role" "scheduler_role" {
 }
 
 # Policy to invoke lambda
-resource "aws_iam_role_policy" "scheduler_lambda_policy" {
-  name = "scheduler-invoke-lambda"
+resource "aws_iam_role_policy" "scheduler_policy" {
+  name = "carpark-scheduler-policy"
   role = aws_iam_role.scheduler_role.name
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
-      Action = "lambda:InvokeFunction"
-      Resource = [
-        module.bronze_lambda.functions.lta_datamall.arn,
-        module.bronze_lambda.functions.hdb_data.arn
-      ]
-
+      Effect   = "Allow"
+      Action   = "events:PutEvents"
+      Resource = aws_cloudwatch_event_bus.main.arn
     }]
   })
 }
 
-resource "aws_scheduler_schedule" "bronze_schedule" {
-  for_each = module.bronze_lambda.functions
-  name     = "${each.key}_bronze_schedule"
+resource "aws_scheduler_schedule" "scheduler_10m" {
+  name = local.scheduler_10m_name
 
   # flexible or exact time
   flexible_time_window {
@@ -40,22 +43,44 @@ resource "aws_scheduler_schedule" "bronze_schedule" {
   }
 
   # cron expression for every 10 minutes
-  schedule_expression = var.bronze_schedule
+  schedule_expression = var.schedule_10m
 
   target {
-    arn      = each.value.arn
+    arn      = aws_cloudwatch_event_bus.main.arn
     role_arn = aws_iam_role.scheduler_role.arn
+
+    input = jsonencode({
+      source   = local.scheduler_10m_name
+      interval = "10m"
+    })
   }
 }
 
-# Resource-based permission for EventBridge to invoke Lambda
-resource "aws_lambda_permission" "allow_scheduler" {
-  for_each = module.bronze_lambda.functions
+resource "aws_cloudwatch_event_rule" "scheduler_10m" {
+  name           = "scheduler-10m-rule"
+  event_bus_name = aws_cloudwatch_event_bus.main.name
 
-  statement_id  = "AllowEventBridgeScheduler"
-  action        = "lambda:InvokeFunction"
-  function_name = each.value.function_name
-  principal     = "scheduler.amazonaws.com"
-  source_arn    = aws_scheduler_schedule.bronze_schedule[each.key].arn
+  event_pattern = jsonencode({
+    source = [
+      aws_scheduler_schedule.scheduler_10m.name
+    ]
+  })
 }
+
+resource "aws_cloudwatch_event_target" "lta-datamall" {
+  rule           = aws_cloudwatch_event_rule.scheduler_10m.name
+  event_bus_name = aws_cloudwatch_event_bus.main.name
+
+  target_id = "lta-datamall"
+  arn       = module.bronze_lambda.functions["lta_datamall"].arn
+}
+
+resource "aws_cloudwatch_event_target" "hdb-data" {
+  rule           = aws_cloudwatch_event_rule.scheduler_10m.name
+  event_bus_name = aws_cloudwatch_event_bus.main.name
+
+  target_id = "hdb-data"
+  arn       = module.bronze_lambda.functions["hdb_data"].arn
+}
+
 
