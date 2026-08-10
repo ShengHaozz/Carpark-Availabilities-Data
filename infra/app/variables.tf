@@ -6,16 +6,6 @@ variable "bucket_name" {
   default = "shenghao-carpark-availability-bucket"
 }
 
-variable "access_key" {
-  type        = string
-  description = "Access Key for Terraform IAM user"
-}
-
-variable "secret_key" {
-  type        = string
-  description = "Secret Key for Terraform IAM User"
-}
-
 variable "datamall_account_key" {
   type        = string
   description = "Account Key for LTA DataMall"
@@ -27,7 +17,12 @@ variable "bronze_schedule" {
   default     = "cron(0/10 * * * ? *)" # every 10 minutes
 }
 
-variable "silver_cold_image_digest" {
+variable "image_digests" {
+  type        = map(string)
+  description = "Image digests for images in ECR"
+}
+
+variable "ecr_repo_url" {
   type        = string
-  description = "Image digest for the silver cold lambda function, filled at runtime"
+  description = "URL for ECR Repository"
 }

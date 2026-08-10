@@ -72,6 +72,7 @@ build:
 	@for pkg in $(FUNCS); do \
 		echo "building $$pkg"; \
 		docker build --platform linux/arm64 \
+			--provenance=false \
 			-t $(REPO_URL):$$pkg \
 			-f packages/$$pkg/Dockerfile \
 			$(WORKSPACE) || exit 1; \
@@ -105,7 +106,11 @@ digests:
 	@cat infra/app/digests.auto.tfvars.json
 
 apply: digests
-	cd infra && terraform apply -auto-approve
+	@echo 'terrform -chdir=infra/app apply -auto-approve'
+	@terraform -chdir=infra/app apply \
+	-var="datamall_account_key=$(DATAMALL_ACCOUNT_KEY)" \
+	-var="ecr_repo_url=$(REPO_URL)" \
+	-auto-approve
 
 deploy: apply
 	@echo "Deployed: $(FUNCS)"

@@ -6,8 +6,8 @@ locals {
 
 data "archive_file" "hdb_data_zip" {
   type        = "zip"
-  source_file = "${path.root}/../packages/hdb_poller/src/hdb_poller/handler.py"
-  output_path = "${path.module}/hdb_data.zip"
+  source_file = "${path.root}/../../packages/hdb_poller/src/hdb_poller/handler.py"
+  output_path = "${path.module}/lambda/hdb_data.zip"
 }
 
 # allow lambda to assume this role

@@ -6,8 +6,8 @@ locals {
 
 data "archive_file" "datamall_lambda_zip" {
   type        = "zip"
-  source_file = "${path.root}/../packages/lta_poller/src/lta_poller/handler.py"
-  output_path = "${path.module}/datamall_lambda.zip"
+  source_file = "${path.root}/../../packages/lta_poller/src/lta_poller/handler.py"
+  output_path = "${path.module}/lambda/datamall_lambda.zip"
 }
 
 # allow lambda to assume this role
