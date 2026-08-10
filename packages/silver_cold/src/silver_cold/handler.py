@@ -3,7 +3,7 @@ from .models import SILVER_PARQUET_SCHEMA, BronzeSnapshot, DatamallCarparkAvaila
 import os
 import json
 from typing import Callable, Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pydantic import TypeAdapter
 import pyarrow as pa
 
@@ -139,12 +139,16 @@ event = {
 def handler(event, context):
     s3 = boto3.client('s3')
 
+    dt = datetime.fromisoformat(
+        event["time"].replace("Z", "+00:00")
+    ) - timedelta(days=1)
+
     lta_key_prefix = KEY_PREFIX.format(
         level = INPUT_LEVEL,
         source = LTA_SOURCE,
-        year = event["year"],
-        month = event["month"],
-        day = event["day"]
+        year = dt.year,
+        month = dt.month,
+        day = dt.day
     )
 
     lta_adapter = TypeAdapter(BronzeSnapshot[DatamallCarparkAvailability])
@@ -152,9 +156,9 @@ def handler(event, context):
     hdb_key_prefix = KEY_PREFIX.format(
         level = INPUT_LEVEL,
         source = HDB_SOURCE,
-        year = event["year"],
-        month = event["month"],
-        day = event["day"]
+        year = dt.year,
+        month = dt.month,
+        day = dt.day
     )
 
     hdb_adapter = TypeAdapter(BronzeSnapshot[HDBCarparkData])
