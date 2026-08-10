@@ -13,8 +13,14 @@ variable "datamall_account_key" {
 
 variable "schedule_10m" {
   type        = string
-  description = "Cron Schedule for bronze ingestion lambda functions"
+  description = "Cron Schedule for 10 mins"
   default     = "cron(0/10 * * * ? *)" # every 10 minutes
+}
+
+variable "schedule_1d" {
+  type        = string
+  description = "Cron Schedule for daily"
+  default     = "cron(0 0 * * ? *)"
 }
 
 variable "image_digests" {
