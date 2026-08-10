@@ -87,22 +87,22 @@ push: login build
 # - fetches each pushed image's digest from ECR
 # - writes infra/digests.auto.tfvars.json for terraform to consume
 digests:
-	@rm -f infra/digests.auto.tfvars.json.tmp
-	@echo '{ "image_digests": {' > infra/digests.auto.tfvars.json.tmp
+	@rm -f infra/app/digests.auto.tfvars.json.tmp
+	@echo '{ "image_digests": {' > infra/app/digests.auto.tfvars.json.tmp
 	@first=1; \
 	for pkg in $(FUNCS); do \
 		digest=$$(aws ecr describe-images --repository-name $(ECR_REPO_NAME) \
 			--image-ids imageTag=$$pkg --region $(AWS_REGION) \
 			--query 'imageDetails[0].imageDigest' --output text); \
 		test -z "$$digest" && echo "Error: failed to get digest for $$pkg" && exit 1; \
-		test $$first -eq 0 && echo ',' >> infra/digests.auto.tfvars.json.tmp; \
-		printf '  "%s": "%s"' "$$pkg" "$$digest" >> infra/digests.auto.tfvars.json.tmp; \
-		echo '' >> infra/digests.auto.tfvars.json.tmp; \
+		test $$first -eq 0 && echo ',' >> infra/app/digests.auto.tfvars.json.tmp; \
+		printf '  "%s": "%s"' "$$pkg" "$$digest" >> infra/app/digests.auto.tfvars.json.tmp; \
+		echo '' >> infra/app/digests.auto.tfvars.json.tmp; \
 		first=0; \
 	done
-	@echo '}}' >> infra/digests.auto.tfvars.json.tmp
-	@mv infra/digests.auto.tfvars.json.tmp infra/digests.auto.tfvars.json
-	@cat infra/digests.auto.tfvars.json
+	@echo '}}' >> infra/app/digests.auto.tfvars.json.tmp
+	@mv infra/app/digests.auto.tfvars.json.tmp infra/app/digests.auto.tfvars.json
+	@cat infra/app/digests.auto.tfvars.json
 
 apply: digests
 	cd infra && terraform apply -auto-approve
