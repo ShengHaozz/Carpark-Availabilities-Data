@@ -35,23 +35,31 @@ bootstrap: profile # create ecr
 		--profile "$(BOOTSTRAP_PROFILE)" \
 		--query 'User.Arn' \
 		--output text); \
-	@echo "Bootstrap user ARN: $$BOOTSTRAP_USER_ARN"; \
+	echo "Bootstrap user ARN: $$BOOTSTRAP_USER_ARN"; \
 	AWS_PROFILE=$(BOOTSTRAP_PROFILE) \
 	terraform -chdir=infra/bootstrap apply \
 	-var="bootstrap_user_arn=$$BOOTSTRAP_USER_ARN" \
 	-auto-approve
 
 	@echo "Making ecr-builder profile"
-	@aws configure set role_arn "$(terraform -chdir=infra/bootstrap output -raw ecr_builder_role_arn)" --profile "$(ECR_BUILDER_PROFILE)"
+	@aws configure set role_arn "$$(terraform -chdir=infra/bootstrap output -raw ecr_builder_role_arn)" --profile "$(ECR_BUILDER_PROFILE)"
 	@aws configure set source_profile "$(BOOTSTRAP_PROFILE)" --profile "$(ECR_BUILDER_PROFILE)"
 	@aws configure set region "$(AWS_REGION)" --profile "$(ECR_BUILDER_PROFILE)"
 	@echo "AWS profile '$(ECR_BUILDER_PROFILE)' configured"
 
 	@echo "Making app-builder profile"
-	@aws configure set role_arn "$(terraform -chdir=infra/bootstrap output -raw app_builder_role_arn)" --profile "$(APP_BUILDER_PROFILE)"
+	@aws configure set role_arn "$$(terraform -chdir=infra/bootstrap output -raw app_builder_role_arn)" --profile "$(APP_BUILDER_PROFILE)"
 	@aws configure set source_profile "$(BOOTSTRAP_PROFILE)" --profile "$(APP_BUILDER_PROFILE)"
 	@aws configure set region "$(AWS_REGION)" --profile "$(APP_BUILDER_PROFILE)"
 	@echo "AWS profile '$(APP_BUILDER_PROFILE)' configured"
+
+ecr_up:
+	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
+	terraform -chdir=infra/ecr apply --auto-approve
+
+ecr_down:
+	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
+	terraform -chdir=infra/ecr destroy --auto-approve
 
 login: bootstrap
 	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \

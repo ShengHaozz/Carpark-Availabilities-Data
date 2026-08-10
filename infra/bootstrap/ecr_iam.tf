@@ -47,7 +47,8 @@ resource "aws_iam_role_policy" "ecr_builder_policy" {
           "ecr:DeleteRepository",
           "ecr:PutLifecyclePolicy",
           "ecr:GetLifecyclePolicy",
-          "ecr:DeleteLifecyclePolicy"
+          "ecr:DeleteLifecyclePolicy",
+          "ecr:ListTagsForResource"
         ]
 
         Resource = "*"
