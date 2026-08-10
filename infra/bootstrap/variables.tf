@@ -1,4 +1,4 @@
-variable "bootstrap_user_name" {
+variable "bootstrap_user_arn" {
   type        = string
-  description = "Username for bootstrap account"
+  description = "ARN for bootstrap account"
 }

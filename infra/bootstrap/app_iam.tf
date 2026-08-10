@@ -1,6 +1,6 @@
 # make ecr builder role for bootstrap to assume
 resource "aws_iam_role" "app_builder" {
-  name = "app_builder"
+  name = "app-builder"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -9,7 +9,7 @@ resource "aws_iam_role" "app_builder" {
       Effect = "Allow"
 
       Principal = {
-        AWS = data.aws_iam_user.bootstrap.arn
+        AWS = var.bootstrap_user_arn
       }
 
       Action = "sts:AssumeRole"

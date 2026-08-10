@@ -9,7 +9,7 @@ resource "aws_iam_role" "ecr_builder" {
       Effect = "Allow"
 
       Principal = {
-        AWS = data.aws_iam_user.bootstrap.arn
+        AWS = var.bootstrap_user_arn
       }
 
       Action = "sts:AssumeRole"

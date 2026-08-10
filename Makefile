@@ -11,7 +11,7 @@ REPO_URL   ?= $(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO_NAME)
 WORKSPACE  := $(shell pwd)
 FUNCS      := silver_cold # func1 func2
 
-.PHONY: profile bootstrap_ecr login build push digests apply deploy
+.PHONY: terraform_init profile bootstrap login build push digests apply deploy
 
 terraform_init:
 	terraform -chdir=infra/app init
@@ -28,14 +28,18 @@ profile: terraform_init
 	@aws configure set region "$(AWS_REGION)" --profile "$(BOOTSTRAP_PROFILE)"
 	@echo "AWS profile '$(BOOTSTRAP_PROFILE)' configured"
 
-	AWS_PROFILE=$(BOOTSTRAP_PROFILE) \
-	terraform -chdir=infra/bootstrap apply -auto-approve
-
 bootstrap: profile # create ecr
 	@echo "Making required roles"
 
+	@BOOTSTRAP_USER_ARN=$$(aws iam get-user \
+		--profile "$(BOOTSTRAP_PROFILE)" \
+		--query 'User.Arn' \
+		--output text); \
+	@echo "Bootstrap user ARN: $$BOOTSTRAP_USER_ARN"; \
 	AWS_PROFILE=$(BOOTSTRAP_PROFILE) \
-	terraform -chdir=infra/bootstrap apply -auto-approve
+	terraform -chdir=infra/bootstrap apply \
+	-var="bootstrap_user_arn=$$BOOTSTRAP_USER_ARN" \
+	-auto-approve
 
 	@echo "Making ecr-builder profile"
 	@aws configure set role_arn "$(terraform -chdir=infra/bootstrap output -raw ecr_builder_role_arn)" --profile "$(ECR_BUILDER_PROFILE)"
@@ -49,7 +53,7 @@ bootstrap: profile # create ecr
 	@aws configure set region "$(AWS_REGION)" --profile "$(APP_BUILDER_PROFILE)"
 	@echo "AWS profile '$(APP_BUILDER_PROFILE)' configured"
 
-login:
+login: bootstrap
 	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
 	aws ecr get-login-password --region $(AWS_REGION) \
 		| docker login --username AWS --password-stdin $(REPO_URL)
