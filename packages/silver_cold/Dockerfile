@@ -1,3 +1,4 @@
+# -- build package
 FROM public.ecr.aws/lambda/python:3.14  AS build
 
 RUN pip install --no-cache-dir uv
@@ -5,11 +6,12 @@ RUN pip install --no-cache-dir uv
 WORKDIR /build
 
 COPY pyproject.toml uv.lock ./
-COPY packages/sd/ packages/sd/ # need to copy with packages/ as need pyproject.toml in root
+COPY packages/silver_cold/ packages/silver_cold/ 
+# need to copy with packages/ as need pyproject.toml in root
 
 RUN uv build --package silver_cold -o dist
 
-RUN uv pip install --system -no-cache-dir dist/silver_cold-*.whl --target /asset
+RUN uv pip install --system --no-cache-dir dist/silver_cold-*.whl --target /asset
 
 # -- copy to lambda --
 FROM public.ecr.aws/lambda/python:3.14

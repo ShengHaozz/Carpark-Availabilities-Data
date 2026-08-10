@@ -55,13 +55,15 @@ bootstrap: profile # create ecr
 
 ecr_up:
 	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
-	terraform -chdir=infra/ecr apply --auto-approve
+	terraform -chdir=infra/ecr apply \
+	-var="ecr_repo_name=$(ECR_REPO_NAME)" \
+	-auto-approve
 
 ecr_down:
 	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
 	terraform -chdir=infra/ecr destroy --auto-approve
 
-login: bootstrap
+login:
 	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
 	aws ecr get-login-password --region $(AWS_REGION) \
 		| docker login --username AWS --password-stdin $(REPO_URL)
@@ -75,7 +77,7 @@ build:
 			$(WORKSPACE) || exit 1; \
 	done
 
-push: bootstrap_ecr login build
+push: login build
 	@for pkg in $(FUNCS); do \
 		echo "pushing $$pkg"; \
 		docker push $(REPO_URL):$$pkg || exit 1; \
