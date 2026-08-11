@@ -57,7 +57,6 @@ resource "aws_scheduler_schedule" "scheduler_10m" {
     }
 
     input = jsonencode({
-      source   = local.scheduler_10m_name
       interval = "10m"
     })
   }
