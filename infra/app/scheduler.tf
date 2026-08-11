@@ -149,3 +149,50 @@ resource "aws_lambda_permission" "silver-cold" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.scheduler_1d.arn
 }
+
+resource "aws_cloudwatch_log_group" "eventbridge_bus_log" {
+  name              = "/aws/events/carpark-events-log"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_resource_policy" "eventbridge_bus_log" {
+  policy_name = "eventbridge-bus-log-policy"
+
+  policy_document = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [{
+      Effect = "Allow"
+
+      Principal = {
+        Service = "events.amazonaws.com"
+      }
+
+      Action = [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ]
+
+      Resource = "${aws_cloudwatch_log_group.eventbridge_bus_log.arn}:*"
+    }]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "eventbridge_bus_log" {
+  name           = "eventbridge-log"
+  event_bus_name = aws_cloudwatch_event_bus.main.name
+
+  event_pattern = jsonencode({
+    source = [{
+      prefix = ""
+    }]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "eventbridge_bus_log" {
+  rule           = aws_cloudwatch_event_rule.eventbridge_bus_log.name
+  event_bus_name = aws_cloudwatch_event_bus.main.name
+
+  target_id = "log-all-events"
+  arn       = aws_cloudwatch_log_group.eventbridge_bus_log.arn
+}
