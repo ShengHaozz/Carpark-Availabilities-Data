@@ -51,6 +51,11 @@ resource "aws_scheduler_schedule" "scheduler_10m" {
     arn      = aws_cloudwatch_event_bus.main.arn
     role_arn = aws_iam_role.scheduler_role.arn
 
+    eventbridge_parameters {
+      source      = local.scheduler_10m_name
+      detail_type = "carpark-scheduler"
+    }
+
     input = jsonencode({
       source   = local.scheduler_10m_name
       interval = "10m"
@@ -116,8 +121,12 @@ resource "aws_scheduler_schedule" "scheduler_1d" {
     arn      = aws_cloudwatch_event_bus.main.arn
     role_arn = aws_iam_role.scheduler_role.arn
 
+    eventbridge_parameters {
+      source      = local.scheduler_1d_name
+      detail_type = "carpark-scheduler"
+    }
+
     input = jsonencode({
-      source   = local.scheduler_1d_name
       interval = "1d"
     })
   }
