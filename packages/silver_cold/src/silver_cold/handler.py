@@ -6,6 +6,8 @@ from typing import Callable, Any
 from datetime import datetime, timezone, timedelta
 from pydantic import TypeAdapter
 import pyarrow as pa
+import pyarrow.fs as pafs
+import pyarrow.parquet as pq
 
 BUCKET = os.environ["BUCKET_NAME"]
 INPUT_LEVEL = os.environ["INPUT_LEVEL"]
@@ -123,9 +125,9 @@ def upload_silver_table_to_s3(
         f"silver_cold.parquet"
     )
 
-    s3fs = pa.fs.S3FileSystem()
+    s3fs = pafs.S3FileSystem()
     with s3fs.open_output_stream(f"{bucket}/{key}") as stream:
-        pa.pq.write_table(silver_table, stream, compression = "zstd")
+        pq.write_table(silver_table, stream, compression = "zstd")
 
     print(f"Uploaded {key}")
 """
