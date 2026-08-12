@@ -35,7 +35,7 @@ def get_snapshots_from_bucket[T](
     snapshots: list[T] = []
 
     for page in s3_client.get_paginator('list_objects_v2').paginate(Bucket = bucket, Prefix = prefix): # Each folder
-        for obj in page.get("Content", []): # Each file in the folder
+        for obj in page.get("Contents", []): # Each file in the folder
             filepath_str = obj["Key"] 
 
             if filepath_str.endswith('/'): # placeholder directories
@@ -172,6 +172,7 @@ def handler(event, context):
         prefix = lta_key_prefix,
         validator = lta_adapter.validate_python
     )
+    print(f"Fetched {len(lta_snapshots)} LTA snapshots")
 
     print(f"Fetching HDB snapshots from s3://{BUCKET}/{hdb_key_prefix}")
     hdb_snapshots = get_snapshots_from_bucket(
@@ -179,6 +180,7 @@ def handler(event, context):
         prefix = hdb_key_prefix,
         validator = hdb_adapter.validate_python
     )
+    print(f"Fetched {len(hdb_snapshots)} HDB snapshots")
 
     print("Transforming snapshots into silver table")
     silver_table = transform(
