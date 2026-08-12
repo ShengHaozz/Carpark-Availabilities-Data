@@ -30,6 +30,16 @@ resource "aws_iam_role_policy" "silver_cold_s3_policy" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "ListBucketForListObjects"
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "${var.s3_bucket.arn}"
+        ]
+      },
+      {
         Sid    = "ReadFromBronze"
         Effect = "Allow"
         Action = [
