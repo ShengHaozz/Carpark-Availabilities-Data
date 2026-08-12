@@ -112,16 +112,16 @@ def transform(
 
 def upload_silver_table_to_s3(
         silver_table: pa.Table,
-        ingestion_timestamp: datetime,
+        reference_timestamp: datetime,
         bucket: str = BUCKET,
         level: str = OUTPUT_LEVEL
     ) -> None:
 
     key = (
         f"level={level}/"
-        f"year={ingestion_timestamp.year}/"
-        f"month={ingestion_timestamp.month:02d}/"
-        f"day={ingestion_timestamp.day:02d}/"
+        f"year={reference_timestamp.year}/"
+        f"month={reference_timestamp.month:02d}/"
+        f"day={reference_timestamp.day:02d}/"
         f"silver_cold.parquet"
     )
 
@@ -130,6 +130,7 @@ def upload_silver_table_to_s3(
         pq.write_table(silver_table, stream, compression = "zstd")
 
     print(f"Uploaded {key}")
+
 """
 event = {
     year: int,
@@ -189,5 +190,5 @@ def handler(event, context):
     print("Uploading silver table to S3")
     upload_silver_table_to_s3(
         silver_table = silver_table,
-        ingestion_timestamp = ingestion_timestamp
+        reference_timestamp = dt    
     )
