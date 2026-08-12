@@ -4,7 +4,7 @@ import os
 import json
 from typing import Callable, Any
 from datetime import datetime, timezone, timedelta
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 import pyarrow as pa
 import pyarrow.fs as pafs
 import pyarrow.parquet as pq
@@ -48,8 +48,15 @@ def get_snapshots_from_bucket[T](
 
             with response['Body'] as body:
                 data = json.loads(body.read())
-            
-            snapshot = validator(data)
+            try:
+                snapshot = validator(data)
+            except ValidationError as e:
+                print("DATA:")
+                print("=" * 10)
+                print(data)
+                print("VALIDATOR:")
+                print(validator.__name__)
+                raise e
             snapshots.append(snapshot)
 
     return snapshots
@@ -61,12 +68,12 @@ def transform(
     ) -> pa.Table:
 
     lta_snapshots.sort(key = lambda x: x.timestamp)
-    hdb_info_d = {(snapshot.timestamp, hdb_data.carpark_number): hdb_data.carpark_info for snapshot in hdb_snapshots for hdb_data in snapshot.values}
+    hdb_info_d = {(snapshot.timestamp, hdb_data.carpark_number): hdb_data.carpark_info for snapshot in hdb_snapshots for hdb_data in snapshot.value}
     
     silver_data: list[dict] = []
 
     for lta_snapshot in lta_snapshots:
-        lta_data = lta_snapshot.values
+        lta_data = lta_snapshot.value
         timestamp = lta_snapshot.timestamp
 
         for lta_datapoint in lta_data:

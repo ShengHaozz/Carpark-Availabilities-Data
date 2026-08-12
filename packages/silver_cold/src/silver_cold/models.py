@@ -5,6 +5,8 @@ from typing import Literal
 from datetime import datetime
 import pyarrow as pa
 
+# TODO: Change value -> values in bronze and silver
+
 class BronzeSnapshot[T](BaseModel):
     timestamp: datetime
     source: str
@@ -12,7 +14,7 @@ class BronzeSnapshot[T](BaseModel):
     poll_end: datetime
     pages: int
     records_count: int
-    values: list[T]
+    value: list[T]
 
 class DatamallCarparkAvailability(BaseModel):
     CarParkID: str
