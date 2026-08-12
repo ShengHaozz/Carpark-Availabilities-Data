@@ -87,7 +87,7 @@ push: login build
 # digests target:
 # - fetches each pushed image's digest from ECR
 # - writes infra/digests.auto.tfvars.json for terraform to consume
-digests:
+digests: push
 	@rm -f infra/app/digests.auto.tfvars.json.tmp
 	@echo '{ "image_digests": {' > infra/app/digests.auto.tfvars.json.tmp
 	@first=1; \
