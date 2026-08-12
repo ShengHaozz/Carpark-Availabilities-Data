@@ -14,6 +14,7 @@ class BronzeSnapshot[T](BaseModel):
     poll_end: datetime
     pages: int
     records_count: int
+    source_filepath: str
     value: list[T]
 
 class DatamallCarparkAvailability(BaseModel):

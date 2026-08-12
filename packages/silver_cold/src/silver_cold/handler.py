@@ -49,6 +49,7 @@ def get_snapshots_from_bucket[T](
             with response['Body'] as body:
                 data = json.loads(body.read())
             try:
+                data["source_filepath"] = filepath_str
                 snapshot = validator(data)
             except ValidationError as e:
                 print("DATA:")
@@ -57,6 +58,7 @@ def get_snapshots_from_bucket[T](
                 print("VALIDATOR:")
                 print(validator.__name__)
                 raise e
+            snapshot
             snapshots.append(snapshot)
 
     return snapshots
