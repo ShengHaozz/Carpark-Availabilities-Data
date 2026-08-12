@@ -186,6 +186,7 @@ def handler(event, context):
         hdb_snapshots = hdb_snapshots,
         ingestion_timestamp = ingestion_timestamp
     )
+    print(f"Created table of {silver_table.num_rows} rows")
 
     print("Uploading silver table to S3")
     upload_silver_table_to_s3(
