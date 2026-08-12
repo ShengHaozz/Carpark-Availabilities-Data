@@ -92,6 +92,7 @@ def transform(
                 'development': lta_datapoint.Development,
                 'agency': lta_datapoint.Agency,
                 'ingestion_timestamp': ingestion_timestamp,
+                'source_filepath': lta_snapshot.source_filepath
             }
             
             # SilverColdCarparkSnapshot(
