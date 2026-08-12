@@ -22,7 +22,7 @@ class DatamallCarparkAvailability(BaseModel):
     Development: str | None = None
     Location: str
     AvailableLots: int = Field(ge = 0)
-    LotType: Literal['C', 'H', 'Y']
+    LotType: Literal['C', 'H', 'S', 'Y']
     Agency: Literal['HDB', 'LTA', 'URA']
 
     @property
