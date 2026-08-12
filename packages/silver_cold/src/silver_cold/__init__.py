@@ -1,2 +1,1 @@
-def hello() -> str:
-    return "Hello from silver-cold!"
+from .handler import handler
