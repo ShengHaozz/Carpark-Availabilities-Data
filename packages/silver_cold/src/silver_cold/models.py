@@ -48,7 +48,7 @@ class HDBCarparkInfo(BaseModel):
     total_lots: int = Field(ge = 0)
 
 class HDBCarparkData(BaseModel) :
-    carpark_info: HDBCarparkInfo
+    carpark_info: list[HDBCarparkInfo]
     carpark_number: str
     update_datetime: str
 

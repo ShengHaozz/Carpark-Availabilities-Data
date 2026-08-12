@@ -68,7 +68,7 @@ def transform(
     ) -> pa.Table:
 
     lta_snapshots.sort(key = lambda x: x.timestamp)
-    hdb_info_d = {(snapshot.timestamp, hdb_data.carpark_number): hdb_data.carpark_info for snapshot in hdb_snapshots for hdb_data in snapshot.value}
+    hdb_info_d = {(snapshot.timestamp, hdb_data.carpark_number): hdb_data.carpark_info[0] for snapshot in hdb_snapshots for hdb_data in snapshot.value}
     
     silver_data: list[dict] = []
 
