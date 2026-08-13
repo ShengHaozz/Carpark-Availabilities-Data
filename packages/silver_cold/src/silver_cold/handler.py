@@ -1,3 +1,5 @@
+from collections.abc import Iterable, Iterator
+
 import boto3
 from .models import SILVER_PARQUET_SCHEMA, BronzeSnapshot, DatamallCarparkAvailability, HDBCarparkData
 import os
@@ -15,12 +17,15 @@ LTA_SOURCE = os.environ["LTA_SOURCE"]
 HDB_SOURCE = os.environ["HDB_SOURCE"]
 OUTPUT_LEVEL = os.environ["OUTPUT_LEVEL"]
 
+HOURS_IN_DAY = 24
+
 KEY_PREFIX = (
     "level={level}/"
     "source={source}/"
     "year={year:02d}/"
     "month={month:02d}/"
     "day={day:02d}/"
+    "hour={{hour:02d}}"
 )
 
 ingestion_timestamp = datetime.now(tz = timezone.utc)
@@ -55,8 +60,6 @@ def get_snapshots_from_bucket[T](
                 print("DATA:")
                 print("=" * 10)
                 print(data)
-                print("VALIDATOR:")
-                print(validator.__name__)
                 raise e
             snapshot
             snapshots.append(snapshot)
@@ -120,8 +123,8 @@ def transform(
     silver_table = pa.Table.from_pylist(silver_data, schema = SILVER_PARQUET_SCHEMA)
     return silver_table
 
-def upload_silver_table_to_s3(
-        silver_table: pa.Table,
+def upload_silver_table_parts_to_s3(
+        silver_table_parts: Iterable[pa.Table],
         reference_timestamp: datetime,
         bucket: str = BUCKET,
         level: str = OUTPUT_LEVEL
@@ -137,9 +140,19 @@ def upload_silver_table_to_s3(
 
     s3fs = pafs.S3FileSystem()
     with s3fs.open_output_stream(f"{bucket}/{key}") as stream:
-        pq.write_table(silver_table, stream, compression = "zstd")
+    
+        writer = pq.ParquetWriter(
+            stream,
+            SILVER_PARQUET_SCHEMA,
+            compression="zstd",
+        )
 
-    print(f"Uploaded {key}")
+        try:
+            for table_part in silver_table_parts:
+                writer.write_table(table_part)
+
+        finally:
+            writer.close()
 
 """
 event = {
@@ -176,32 +189,38 @@ def handler(event, context):
 
     hdb_adapter = TypeAdapter(BronzeSnapshot[HDBCarparkData])
 
-    print(f"Fetching LTA snapshots from s3://{BUCKET}/{lta_key_prefix}")
-    lta_snapshots = get_snapshots_from_bucket(
-        s3_client = s3,
-        prefix = lta_key_prefix,
-        validator = lta_adapter.validate_python
-    )
-    print(f"Fetched {len(lta_snapshots)} LTA snapshots")
+    
+    def table_part_generator() -> Iterator[pa.Table]:
+        for hour in range(HOURS_IN_DAY):
+            print(f"Fetching /hour={hour:02d}")
+            lta_snapshots = get_snapshots_from_bucket(
+                s3_client = s3,
+                prefix = lta_key_prefix.format(hour = hour),
+                validator = lta_adapter.validate_python
+            )
+            print(f"Fetched {len(lta_snapshots)} LTA snapshots")
 
-    print(f"Fetching HDB snapshots from s3://{BUCKET}/{hdb_key_prefix}")
-    hdb_snapshots = get_snapshots_from_bucket(
-        s3_client = s3,
-        prefix = hdb_key_prefix,
-        validator = hdb_adapter.validate_python
-    )
-    print(f"Fetched {len(hdb_snapshots)} HDB snapshots")
+            hdb_snapshots = get_snapshots_from_bucket(
+                s3_client = s3,
+                prefix = hdb_key_prefix.format(hour = hour),
+                validator = hdb_adapter.validate_python
+            )
+            print(f"Fetched {len(hdb_snapshots)} HDB snapshots")
 
-    print("Transforming snapshots into silver table")
-    silver_table = transform(
-        lta_snapshots = lta_snapshots,
-        hdb_snapshots = hdb_snapshots,
-        ingestion_timestamp = ingestion_timestamp
-    )
-    print(f"Created table of {silver_table.num_rows} rows")
+            print("Transforming snapshots into silver table")
+            silver_table_part = transform(
+                lta_snapshots = lta_snapshots,
+                hdb_snapshots = hdb_snapshots,
+                ingestion_timestamp = ingestion_timestamp
+            )
+            print(f"Created table of {silver_table_part.num_rows} rows")
+
+            yield silver_table_part
+
+
 
     print("Uploading silver table to S3")
-    upload_silver_table_to_s3(
-        silver_table = silver_table,
+    upload_silver_table_parts_to_s3(
+        silver_table_parts = table_part_generator(),
         reference_timestamp = dt    
     )
