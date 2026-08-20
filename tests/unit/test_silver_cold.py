@@ -25,7 +25,6 @@ class Test_Silver_Cold:
         )
 
         ingestion_timestamp = "2026-08-11T09:00:13.432756+00:00"
-
         table = transform(
             lta_snapshots=lta_snapshots,
             hdb_snapshots=hdb_snapshots,
@@ -46,24 +45,28 @@ class Test_Silver_Cold:
         assert len(rows) == snapshot_count * data_count
 
         # Reference original Bronze data
-        lta_values = lta_snapshots[0]["value"]
-        hdb_values = hdb_snapshots[0]["value"]
+        lta_values = lta_snapshots[0].value
+        hdb_values = hdb_snapshots[0].value
 
         for row in rows:
             carpark_id = row.carpark_id
 
             lta_value = next(
-                (value
-                for value in lta_values
-                if value["CarParkID"] == carpark_id),
-                default = None
+                (
+                    value
+                    for value in lta_values
+                    if value.CarParkID == carpark_id
+                ),
+                None,
             )
 
             hdb_value = next(
-                (value
-                for value in hdb_values
-                if value["carpark_number"] == carpark_id),
-                default = None
+                (
+                    value
+                    for value in hdb_values
+                    if value.carpark_number == carpark_id
+                ),
+                None,
             )
 
             # Test matching lta and hdb value
@@ -71,18 +74,14 @@ class Test_Silver_Cold:
             assert hdb_value
 
             # Test HDB Data
-            assert row.lots_available == int(
-                hdb_value["carpark_info"][0]["lots_available"]
-            )
+            assert row.lots_available == hdb_value.carpark_info[0].lots_available
 
-            assert row.total_lots == int(
-                hdb_value["carpark_info"][0]["total_lots"]
-            )
+            assert row.total_lots == hdb_value.carpark_info[0].total_lots
 
-            assert row.lot_type == hdb_value["carpark_info"][0]["lot_type"]
+            assert row.lot_type == hdb_value.carpark_info[0].lot_type
 
             # Test LTA values
-            latitude, longitude = lta_value["Location"].split()
+            latitude, longitude = lta_value.Location.split()
 
             assert row.location_latitude == pytest.approx(
                 float(latitude)
@@ -92,14 +91,12 @@ class Test_Silver_Cold:
                 float(longitude)
             )
 
-            assert row.area == lta_value["Area"]
-            assert row.development == lta_value["Development"]
-            assert row.agency == lta_value["Agency"]
+            assert row.area == lta_value.Area
+            assert row.development == lta_value.Development
+            assert row.agency == lta_value.Agency
 
             # Test snapshot timestamp comes from the LTA Bronze snapshot
-            assert row.snapshot_timestamp == datetime.fromisoformat(
-                lta_snapshots[0]["timestamp"]
-            )
+            assert row.snapshot_timestamp == lta_snapshots[0].timestamp
 
             # Test ingestion timestamp comes from the transform argument
             assert row.ingestion_timestamp == datetime.fromisoformat(
@@ -150,9 +147,7 @@ class Test_Silver_Cold:
             lta_snapshots,
             hdb_snapshots,
         ):
-            snapshot_timestamp = datetime.fromisoformat(
-                lta_snapshot["timestamp"]
-            )
+            snapshot_timestamp = lta_snapshot.timestamp
 
             # Find all Silver rows belonging to this snapshot
             snapshot_rows = [
@@ -163,18 +158,18 @@ class Test_Silver_Cold:
 
             assert len(snapshot_rows) == data_count
 
-            lta_values = lta_snapshot["value"]
-            hdb_values = hdb_snapshot["value"]
+            lta_values = lta_snapshot.value
+            hdb_values = hdb_snapshot.value
 
             # Check every carpark in this snapshot
             for lta_value in lta_values:
-                carpark_id = lta_value["CarParkID"]
+                carpark_id = lta_value.CarParkID
 
                 # Find corresponding HDB record
                 hdb_value = next(
                     value
                     for value in hdb_values
-                    if value["carpark_number"] == carpark_id
+                    if value.carpark_number == carpark_id
                 )
 
                 # Find corresponding Silver record
@@ -188,23 +183,19 @@ class Test_Silver_Cold:
                 # HDB → Silver
                 # -------------------------
 
-                hdb_info = hdb_value["carpark_info"][0]
+                hdb_info = hdb_value.carpark_info[0]
 
-                assert silver_row.lots_available == int(
-                    hdb_info["lots_available"]
-                )
+                assert silver_row.lots_available == hdb_info.lots_available
 
-                assert silver_row.total_lots == int(
-                    hdb_info["total_lots"]
-                )
+                assert silver_row.total_lots == hdb_info.total_lots
 
-                assert silver_row.lot_type == hdb_info["lot_type"]
+                assert silver_row.lot_type == hdb_info.lot_type
 
                 # -------------------------
                 # LTA → Silver
                 # -------------------------
 
-                latitude, longitude = lta_value["Location"].split()
+                latitude, longitude = lta_value.Location.split()
 
                 assert silver_row.location_latitude == pytest.approx(
                     float(latitude)
@@ -214,16 +205,16 @@ class Test_Silver_Cold:
                     float(longitude)
                 )
 
-                assert silver_row.area == lta_value["Area"]
-                assert silver_row.development == lta_value["Development"]
-                assert silver_row.agency == lta_value["Agency"]
+                assert silver_row.area == lta_value.Area
+                assert silver_row.development == lta_value.Development
+                assert silver_row.agency == lta_value.Agency
 
                 # -------------------------
                 # Shared fields
                 # -------------------------
 
-                assert silver_row.carpark_id == lta_value["CarParkID"]
-                assert silver_row.carpark_id == hdb_value["carpark_number"]
+                assert silver_row.carpark_id == lta_value.CarParkID
+                assert silver_row.carpark_id == hdb_value.carpark_number
 
                 assert silver_row.snapshot_timestamp == snapshot_timestamp
 

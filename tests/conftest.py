@@ -25,9 +25,9 @@ def hdb_api_response_generator():
                     "carpark_number": f"CP{j:04d}",
                     "carpark_info": [
                         {
-                            "total_lots": "105",
+                            "total_lots": 105,
                             "lot_type": "C",
-                            "lots_available": str(30 + j + i),
+                            "lots_available": 30 + j + i,
                         }
                     ],
                 })
