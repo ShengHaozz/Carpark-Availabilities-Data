@@ -15,11 +15,11 @@ class Test_Silver_Cold:
         snapshot_count = 1
         data_count = 2
 
-        lta_snapshots = lta_bronze_snapshot_generator()(
+        lta_snapshots = lta_bronze_snapshot_generator(
             snapshot_count=snapshot_count,
             data_count=data_count,
         )
-        hdb_snapshots = hdb_bronze_snapshot_generator()(
+        hdb_snapshots = hdb_bronze_snapshot_generator(
             snapshot_count=snapshot_count,
             data_count=data_count,
         )
