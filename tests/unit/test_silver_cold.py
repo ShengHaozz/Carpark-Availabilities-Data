@@ -100,9 +100,8 @@ class Test_Silver_Cold:
             assert row.snapshot_timestamp == lta_snapshots[0].timestamp
 
             # Test ingestion timestamp comes from the transform argument
-            assert row.ingestion_timestamp == datetime.fromisoformat(
-                ingestion_timestamp
-            )
+            assert row.ingestion_timestamp == ingestion_timestamp
+            
     
     def test_transform_multiple_snapshots(
         self,
@@ -220,12 +219,8 @@ class Test_Silver_Cold:
                 assert silver_row.snapshot_timestamp == snapshot_timestamp
 
         # Test ingestion timestamp
-        expected_ingestion_timestamp = datetime.fromisoformat(
-            ingestion_timestamp
-        )
-
         assert all(
-            row.ingestion_timestamp == expected_ingestion_timestamp
+            row.ingestion_timestamp == ingestion_timestamp
             for row in rows
         )
 
