@@ -24,7 +24,8 @@ class Test_Silver_Cold:
             data_count=data_count,
         )
 
-        ingestion_timestamp = "2026-08-11T09:00:13.432756+00:00"
+        ingestion_timestamp = datetime.fromisoformat("2026-08-11T09:00:13.432756+00:00")
+
         table = transform(
             lta_snapshots=lta_snapshots,
             hdb_snapshots=hdb_snapshots,
@@ -121,7 +122,7 @@ class Test_Silver_Cold:
             data_count=data_count,
         )
 
-        ingestion_timestamp = "2026-08-11T09:00:13.432756+00:00"
+        ingestion_timestamp = datetime.fromisoformat("2026-08-11T09:00:13.432756+00:00")
 
         table = transform(
             lta_snapshots=lta_snapshots,
