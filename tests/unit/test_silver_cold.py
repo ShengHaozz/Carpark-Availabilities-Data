@@ -12,16 +12,16 @@ from packages.silver_cold.src.silver_cold import (
 
 class Test_Silver_Cold:
     def test_transform_indiv_snapshot(self, lta_bronze_snapshot_generator, hdb_bronze_snapshot_generator):
-        SNAPSHOT_COUNT = 1
-        DATA_COUNT = 2
+        snapshot_count = 1
+        data_count = 2
 
         lta_snapshots = lta_bronze_snapshot_generator()(
-            snapshot_count=SNAPSHOT_COUNT,
-            data_count=DATA_COUNT,
+            snapshot_count=snapshot_count,
+            data_count=data_count,
         )
         hdb_snapshots = hdb_bronze_snapshot_generator()(
-            snapshot_count=SNAPSHOT_COUNT,
-            data_count=DATA_COUNT,
+            snapshot_count=snapshot_count,
+            data_count=data_count,
         )
 
         ingestion_timestamp = "2026-08-11T09:00:13.432756+00:00"
@@ -36,14 +36,14 @@ class Test_Silver_Cold:
         assert table.schema == SILVER_PARQUET_SCHEMA
 
         # Test 1 snapshot x 2 rows
-        assert table.num_rows == SNAPSHOT_COUNT * DATA_COUNT
+        assert table.num_rows == snapshot_count * data_count
 
         # Test silver model
         rows = [
             SilverColdCarparkSnapshot.model_validate(row)
             for row in table.to_pylist()
         ]
-        assert len(rows) == SNAPSHOT_COUNT * DATA_COUNT
+        assert len(rows) == snapshot_count * data_count
 
         # Reference original Bronze data
         lta_values = lta_snapshots[0]["value"]
