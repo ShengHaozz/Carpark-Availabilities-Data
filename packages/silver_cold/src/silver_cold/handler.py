@@ -11,12 +11,6 @@ import pyarrow as pa
 import pyarrow.fs as pafs
 import pyarrow.parquet as pq
 
-BUCKET = os.environ["BUCKET_NAME"]
-INPUT_LEVEL = os.environ["INPUT_LEVEL"]
-LTA_SOURCE = os.environ["LTA_SOURCE"]
-HDB_SOURCE = os.environ["HDB_SOURCE"]
-OUTPUT_LEVEL = os.environ["OUTPUT_LEVEL"]
-
 HOURS_IN_DAY = 24
 
 KEY_PREFIX = (
@@ -34,7 +28,7 @@ def get_snapshots_from_bucket[T](
         s3_client: Any,
         prefix: str, 
         validator: Callable[[dict], T],
-        bucket: str = BUCKET
+        bucket: str
     ) -> list[T]:
 
     snapshots: list[T] = []
@@ -126,8 +120,8 @@ def transform(
 def upload_silver_table_parts_to_s3(
         silver_table_parts: Iterable[pa.Table],
         reference_timestamp: datetime,
-        bucket: str = BUCKET,
-        level: str = OUTPUT_LEVEL
+        bucket: str,
+        level: str
     ) -> None:
 
     key = (
@@ -163,6 +157,12 @@ event = {
 """
 
 def handler(event, context):
+    BUCKET = os.environ["BUCKET_NAME"]
+    INPUT_LEVEL = os.environ["INPUT_LEVEL"]
+    LTA_SOURCE = os.environ["LTA_SOURCE"]
+    HDB_SOURCE = os.environ["HDB_SOURCE"]
+    OUTPUT_LEVEL = os.environ["OUTPUT_LEVEL"]
+
     s3 = boto3.client('s3')
 
     dt = datetime.fromisoformat(
@@ -196,14 +196,16 @@ def handler(event, context):
             lta_snapshots = get_snapshots_from_bucket(
                 s3_client = s3,
                 prefix = lta_key_prefix.format(hour = hour),
-                validator = lta_adapter.validate_python
+                validator = lta_adapter.validate_python,
+                bucket = BUCKET
             )
             print(f"Fetched {len(lta_snapshots)} LTA snapshots")
 
             hdb_snapshots = get_snapshots_from_bucket(
                 s3_client = s3,
                 prefix = hdb_key_prefix.format(hour = hour),
-                validator = hdb_adapter.validate_python
+                validator = hdb_adapter.validate_python,
+                bucket = BUCKET
             )
             print(f"Fetched {len(hdb_snapshots)} HDB snapshots")
 
@@ -222,5 +224,7 @@ def handler(event, context):
     print("Uploading silver table to S3")
     upload_silver_table_parts_to_s3(
         silver_table_parts = table_part_generator(),
-        reference_timestamp = dt    
+        reference_timestamp = dt,
+        bucket = BUCKET,
+        level = OUTPUT_LEVEL
     )
