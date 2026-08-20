@@ -5,6 +5,7 @@ from packages.silver_cold.src.silver_cold.models import (
     HDBCarparkData,
     HDBCarparkInfo,
 )
+from datetime import datetime
 
 @pytest.fixture
 def hdb_api_response_generator():
@@ -76,7 +77,7 @@ def hdb_bronze_snapshot_generator():
 
             snapshots.append(
                 BronzeSnapshot(
-                    timestamp=f"2026-08-11T09:00:{i % 60:02d}+00:00",
+                    timestamp=datetime.fromisoformat(f"2026-08-11T09:{i % 60:02d}:00+00:00"),
                     source="hdb",
                     poll_start="2026-08-11T09:00:12.173321+00:00",
                     poll_end="2026-08-11T09:00:13.432756+00:00",
@@ -153,7 +154,7 @@ def lta_bronze_snapshot_generator():
 
             snapshots.append(
                 BronzeSnapshot(
-                    timestamp=f"2026-08-10T11:00:{i % 60:02d}+00:00",
+                    timestamp=datetime.fromisoformat(f"2026-08-11T09:{i % 60:02d}:00+00:00"),
                     source="lta",
                     poll_start="2026-08-10T11:00:07.245049+00:00",
                     poll_end="2026-08-10T11:00:08.031497+00:00",
