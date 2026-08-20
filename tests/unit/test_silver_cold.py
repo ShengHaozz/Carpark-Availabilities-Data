@@ -224,4 +224,191 @@ class Test_Silver_Cold:
             for row in rows
         )
 
+    def test_transform_missing_lta_snapshots(
+        self,
+        lta_bronze_snapshot_generator,
+        hdb_bronze_snapshot_generator,
+    ):
+        snapshot_count = 4
+        data_count = 2
 
+        lta_snapshots = lta_bronze_snapshot_generator(
+            snapshot_count=snapshot_count,
+            data_count=data_count,
+        )
+
+        hdb_snapshots = hdb_bronze_snapshot_generator(
+            snapshot_count=snapshot_count,
+            data_count=data_count,
+        )
+
+        # Remove 2 LTA snapshots
+        lta_snapshots = lta_snapshots[:2]
+
+        ingestion_timestamp = datetime.fromisoformat(
+            "2026-08-11T09:00:13.432756+00:00"
+        )
+
+        table = transform(
+            lta_snapshots=lta_snapshots,
+            hdb_snapshots=hdb_snapshots,
+            ingestion_timestamp=ingestion_timestamp,
+        )
+
+        # Test schema
+        assert table.schema == SILVER_PARQUET_SCHEMA
+
+        # Test num rows
+        assert table.num_rows == (snapshot_count - 2) * data_count
+
+        # Test silver model
+        rows = [
+            SilverColdCarparkSnapshot.model_validate(row)
+            for row in table.to_pylist()
+        ]
+
+        assert len(rows) == (snapshot_count - 2) * data_count
+
+        # Test every Silver row corresponds to an LTA snapshot
+        for row in rows:
+            lta_snapshot = next(
+                snapshot
+                for snapshot in lta_snapshots
+                if snapshot.timestamp == row.snapshot_timestamp
+            )
+
+            lta_value = next(
+                value
+                for value in lta_snapshot.value
+                if value.CarParkID == row.carpark_id
+            )
+
+            # Test LTA values
+            assert row.lots_available == lta_value.AvailableLots
+            assert row.lot_type == lta_value.LotType
+
+            latitude, longitude = lta_value.Location.split()
+
+            assert row.location_latitude == pytest.approx(
+                float(latitude)
+            )
+
+            assert row.location_longitude == pytest.approx(
+                float(longitude)
+            )
+
+            assert row.area == lta_value.Area
+            assert row.development == lta_value.Development
+            assert row.agency == lta_value.Agency
+
+            # Test corresponding HDB data
+            hdb_snapshot = next(
+                snapshot
+                for snapshot in hdb_snapshots
+                if snapshot.timestamp == row.snapshot_timestamp
+            )
+
+            hdb_value = next(
+                value
+                for value in hdb_snapshot.value
+                if value.carpark_number == row.carpark_id
+            )
+
+            hdb_info = hdb_value.carpark_info[0]
+
+            assert row.lots_available == hdb_info.lots_available
+            assert row.total_lots == hdb_info.total_lots
+            assert row.lot_type == hdb_info.lot_type
+
+            # Test snapshot timestamp
+            assert row.snapshot_timestamp == lta_snapshot.timestamp
+
+        # Test ingestion timestamp
+        assert all(
+            row.ingestion_timestamp == ingestion_timestamp
+            for row in rows
+        )
+
+    def test_transform_missing_hdb_snapshots(
+        self,
+        lta_bronze_snapshot_generator,
+        hdb_bronze_snapshot_generator,
+    ):
+        snapshot_count = 4
+        data_count = 2
+
+        lta_snapshots = lta_bronze_snapshot_generator(
+            snapshot_count=snapshot_count,
+            data_count=data_count,
+        )
+
+        hdb_snapshots = hdb_bronze_snapshot_generator(
+            snapshot_count=snapshot_count,
+            data_count=data_count,
+        )
+
+        # Remove 2 HDB snapshots
+        hdb_snapshots = hdb_snapshots[1:3]
+
+        ingestion_timestamp = datetime.fromisoformat(
+            "2026-08-11T09:00:13.432756+00:00"
+        )
+
+        table = transform(
+            lta_snapshots=lta_snapshots,
+            hdb_snapshots=hdb_snapshots,
+            ingestion_timestamp=ingestion_timestamp,
+        )
+
+        # Test schema
+        assert table.schema == SILVER_PARQUET_SCHEMA
+
+        # Test num rows
+        assert table.num_rows == snapshot_count * data_count
+
+        # Test silver model
+        rows = [
+            SilverColdCarparkSnapshot.model_validate(row)
+            for row in table.to_pylist()
+        ]
+
+        assert len(rows) == snapshot_count * data_count
+
+        # Find rows where HDB data is missing
+        missing_hdb_rows = [
+            row
+            for row in rows
+            if row.total_lots is None
+        ]
+
+        # Test 2 missing HDB snapshots x 2 rows
+        assert len(missing_hdb_rows) == 2 * data_count
+
+        # Test LTA values for rows with missing HDB data
+        for row in missing_hdb_rows:
+            lta_snapshot = next(
+                snapshot
+                for snapshot in lta_snapshots
+                if snapshot.timestamp == row.snapshot_timestamp
+            )
+
+            lta_value = next(
+                value
+                for value in lta_snapshot.value
+                if value.CarParkID == row.carpark_id
+            )
+
+            # HDB data is missing, so total lots should be None
+            assert row.total_lots is None
+
+            # lots available and lot type should follow LTA
+            assert row.lots_available == lta_value.AvailableLots
+            assert row.lot_type == lta_value.LotType
+
+        # Test ingestion timestamp
+        expected_ingestion_timestamp = ingestion_timestamp
+
+        assert all(
+            row.ingestion_timestamp == expected_ingestion_timestamp
+            for row in rows
+        )
