@@ -12,9 +12,12 @@ members = ["packages/*"]
 dev = [
     "boto3>=1.43.75",
     "mypy>=2.2.0",
+    "pyarrow>=24.0.0",
+    "pydantic>=2.13.4",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.15.20",
+    "tzdata>=2026.3",
 ]
 
 [tool.pytest.ini_options]
