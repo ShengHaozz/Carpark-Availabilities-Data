@@ -55,7 +55,7 @@ def get_snapshots_from_bucket[T](
                 print("=" * 10)
                 print(data)
                 raise e
-            snapshot
+            
             snapshots.append(snapshot)
 
     return snapshots
