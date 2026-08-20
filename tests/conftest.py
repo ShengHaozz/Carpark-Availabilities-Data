@@ -1,5 +1,10 @@
 import pytest
-
+from packages.silver_cold.src.silver_cold.models import (
+    BronzeSnapshot,
+    DatamallCarparkAvailability,
+    HDBCarparkData,
+    HDBCarparkInfo,
+)
 
 @pytest.fixture
 def hdb_api_response_generator():
@@ -53,31 +58,34 @@ def hdb_bronze_snapshot_generator():
             values = []
 
             for j in range(data_count):
-                values.append({
-                    "carpark_info": [
-                        {
-                            "total_lots": "105",
-                            "lot_type": "C",
-                            "lots_available": str(30 + j + i),
-                        }
-                    ],
-                    "carpark_number": f"CP{j:04d}",
-                    "update_datetime": (
-                        f"2026-08-11T16:58:{i % 60:02d}"
-                    ),
-                })
+                values.append(
+                    HDBCarparkData(
+                        carpark_info=[
+                            HDBCarparkInfo(
+                                total_lots=105,
+                                lot_type="C",
+                                lots_available=30 + j + i,
+                            )
+                        ],
+                        carpark_number=f"CP{j:04d}",
+                        update_datetime=(
+                            f"2026-08-11T16:58:{i % 60:02d}"
+                        ),
+                    )
+                )
 
-            snapshots.append({
-                "timestamp": (
-                    f"2026-08-11T09:00:{i % 60:02d}+00:00"
-                ),
-                "source": "hdb",
-                "poll_start": "2026-08-11T09:00:12.173321+00:00",
-                "poll_end": "2026-08-11T09:00:13.432756+00:00",
-                "pages": 1,
-                "records_count": data_count,
-                "value": values
-            })
+            snapshots.append(
+                BronzeSnapshot(
+                    timestamp=f"2026-08-11T09:00:{i % 60:02d}+00:00",
+                    source="hdb",
+                    poll_start="2026-08-11T09:00:12.173321+00:00",
+                    poll_end="2026-08-11T09:00:13.432756+00:00",
+                    pages=1,
+                    records_count=data_count,
+                    source_filepath=f"s3://test/hdb/{i}.json",
+                    value=values,
+                )
+            )
 
         return snapshots
 
@@ -131,27 +139,30 @@ def lta_bronze_snapshot_generator():
             values = []
 
             for j in range(data_count):
-                values.append({
-                    "CarParkID": f"CP{j:04d}",
-                    "Area": "",
-                    "Development": f"BLK {j:04d}",
-                    "Location": f"1.2937{j} 103.8571{j}",
-                    "AvailableLots": 30 + j + i,
-                    "LotType": "C",
-                    "Agency": "HDB"
-                })
+                values.append(
+                    DatamallCarparkAvailability(
+                        CarParkID=f"CP{j:04d}",
+                        Area="",
+                        Development=f"BLK {j:04d}",
+                        Location=f"1.2937{j} 103.8571{j}",
+                        AvailableLots=30 + j + i,
+                        LotType="C",
+                        Agency="HDB",
+                    )
+                )
 
-            snapshots.append({
-                "timestamp": (
-                    f"2026-08-10T11:00:{i % 60:02d}+00:00"
-                ),
-                "source": "lta",
-                "poll_start": "2026-08-10T11:00:07.245049+00:00",
-                "poll_end": "2026-08-10T11:00:08.031497+00:00",
-                "pages": 6,
-                "records_count": data_count,
-                "value": values
-            })
+            snapshots.append(
+                BronzeSnapshot(
+                    timestamp=f"2026-08-10T11:00:{i % 60:02d}+00:00",
+                    source="lta",
+                    poll_start="2026-08-10T11:00:07.245049+00:00",
+                    poll_end="2026-08-10T11:00:08.031497+00:00",
+                    pages=6,
+                    records_count=data_count,
+                    source_filepath=f"s3://test/lta/{i}.json",
+                    value=values,
+                )
+            )
 
         return snapshots
 
