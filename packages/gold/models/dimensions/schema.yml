@@ -1,0 +1,48 @@
+version: 2
+
+models:
+  - name: dim_carpark
+    description: "Carpark SCD Type 2 dimension table tracking carpark master metadata and capacity changes over time as an Apache Iceberg table."
+    columns:
+      - name: carpark_key
+        description: "Deterministic surrogate key: md5(carpark_id | lot_type | valid_from)."
+        data_tests:
+          - unique
+          - not_null
+      - name: carpark_id
+        description: "Natural business key for the carpark."
+        data_tests:
+          - not_null
+      - name: lot_type
+        description: "Vehicle lot type (C: Car, H: Heavy, Y: Motorcycle, S: Special, unknown)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['C', 'H', 'S', 'Y', 'unknown']
+      - name: total_lots
+        description: "Total lot capacity for this lot type. Tracked historically in SCD2."
+      - name: development
+        description: "Development or building name."
+      - name: area
+        description: "Geographical area (e.g. ORCHARD, JURONG, etc.)."
+      - name: agency
+        description: "Managing agency (HDB, LTA, URA)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['HDB', 'LTA', 'URA']
+      - name: location_latitude
+        description: "Latitude coordinate of the carpark."
+      - name: location_longitude
+        description: "Longitude coordinate of the carpark."
+      - name: valid_from
+        description: "Start timestamp of this record version (inclusive)."
+        data_tests:
+          - not_null
+      - name: valid_to
+        description: "End timestamp of this record version (exclusive). NULL indicates the currently active version."
+      - name: is_current
+        description: "Boolean flag: TRUE if this is the currently active version of the carpark record."
+        data_tests:
+          - not_null
+

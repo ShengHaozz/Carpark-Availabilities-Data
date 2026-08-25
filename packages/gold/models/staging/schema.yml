@@ -1,0 +1,52 @@
+version: 2
+
+models:
+  - name: stg_silver__carpark_snapshots
+    description: "Staging view that cleans, types, and deduplicates records from the Silver cold parquet dataset."
+    columns:
+      - name: snapshot_id
+        description: "Deterministic hash key for deduplication and identification: md5(carpark_id | lot_type | snapshot_timestamp)."
+        data_tests:
+          - unique
+          - not_null
+      - name: carpark_id
+        description: "Unique carpark identifier."
+        data_tests:
+          - not_null
+      - name: lot_type
+        description: "Vehicle lot type code."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['C', 'H', 'S', 'Y', 'unknown']
+      - name: lots_available
+        description: "Count of available lots (non-negative integer)."
+        data_tests:
+          - not_null
+      - name: total_lots
+        description: "Total lot capacity."
+      - name: location_latitude
+        description: "Latitude coordinate."
+      - name: location_longitude
+        description: "Longitude coordinate."
+      - name: area
+        description: "Geographic area designation."
+      - name: development
+        description: "Building or development name."
+      - name: agency
+        description: "Agency managing the carpark."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['HDB', 'LTA', 'URA']
+      - name: snapshot_timestamp
+        description: "UTC timestamp of the snapshot observation."
+        data_tests:
+          - not_null
+      - name: ingestion_timestamp
+        description: "UTC timestamp of silver layer ingestion."
+        data_tests:
+          - not_null
+      - name: source_filepath
+        description: "Source bronze S3 filepath."
+

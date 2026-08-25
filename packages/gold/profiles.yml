@@ -9,4 +9,3 @@ gold:
       s3_staging_dir: "s3://{{ env_var('S3_BUCKET') }}/athena-query-results/"
       threads: 1
   target: dev
-

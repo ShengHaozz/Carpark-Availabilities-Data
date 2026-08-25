@@ -1,0 +1,55 @@
+version: 2
+
+models:
+  - name: fct_lot_availability
+    description: "Periodic snapshot fact table recording 10-minute lot availability observations as an Apache Iceberg table partitioned by day."
+    columns:
+      - name: availability_id
+        description: "Deterministic primary key: md5(carpark_id | lot_type | snapshot_timestamp)."
+        data_tests:
+          - unique
+          - not_null
+      - name: carpark_key
+        description: "Surrogate foreign key referencing dim_carpark at the time of the snapshot observation."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_carpark')
+              field: carpark_key
+      - name: carpark_id
+        description: "Natural key for the carpark (degenerate dimension)."
+        data_tests:
+          - not_null
+      - name: lot_type
+        description: "Vehicle lot type code."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ['C', 'H', 'S', 'Y', 'unknown']
+      - name: snapshot_timestamp
+        description: "UTC observation timestamp."
+        data_tests:
+          - not_null
+      - name: snapshot_date
+        description: "Observation date derived from snapshot_timestamp, used as the Iceberg partition column."
+        data_tests:
+          - not_null
+      - name: lots_available
+        description: "Number of available lots at snapshot time."
+        data_tests:
+          - not_null
+      - name: total_lots
+        description: "Total lot capacity inherited from dim_carpark."
+      - name: lots_occupied
+        description: "Calculated metric: total_lots - lots_available (NULL if total_lots is unknown)."
+      - name: occupancy_rate
+        description: "Calculated ratio: (total_lots - lots_available) / total_lots (rounded to 4 decimal places)."
+      - name: is_full
+        description: "Boolean flag: TRUE when lots_available is 0."
+        data_tests:
+          - not_null
+      - name: ingestion_timestamp
+        description: "Timestamp when the silver Lambda processed the data."
+        data_tests:
+          - not_null
+

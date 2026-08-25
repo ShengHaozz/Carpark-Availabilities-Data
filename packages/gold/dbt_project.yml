@@ -31,6 +31,15 @@ clean-targets:         # directories to be removed by `dbt clean`
 # files using the `{{ config(...) }}` macro.
 models:
   gold:
-    # Config indicated by + and applies to all files under models/example/
-    example:
+    staging:
       +materialized: view
+      +schema: staging
+    dimensions:
+      +materialized: incremental
+      +table_type: iceberg
+      +schema: gold
+    facts:
+      +materialized: incremental
+      +table_type: iceberg
+      +schema: gold
+
