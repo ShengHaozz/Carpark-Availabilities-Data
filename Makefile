@@ -114,3 +114,11 @@ apply: digests
 
 deploy: apply
 	@echo "Deployed: $(FUNCS)"
+
+dbt_debug:
+	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
+	uv run --package gold dbt debug --project-dir packages/gold --profiles-dir packages/gold
+
+dbt_run:
+	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
+	uv run --package gold dbt run --project-dir packages/gold --profiles-dir packages/gold
