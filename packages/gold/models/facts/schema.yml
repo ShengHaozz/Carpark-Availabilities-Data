@@ -14,8 +14,9 @@ models:
         data_tests:
           - not_null
           - relationships:
-              to: ref('dim_carpark')
-              field: carpark_key
+              arguments:
+                to: ref('dim_carpark')
+                field: carpark_key
       - name: carpark_id
         description: "Natural key for the carpark (degenerate dimension)."
         data_tests:
@@ -25,7 +26,8 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['C', 'H', 'S', 'Y', 'unknown']
+              arguments:
+                values: ['C', 'H', 'S', 'Y', 'unknown']
       - name: snapshot_timestamp
         description: "UTC observation timestamp."
         data_tests:
@@ -52,4 +54,3 @@ models:
         description: "Timestamp when the silver Lambda processed the data."
         data_tests:
           - not_null
-

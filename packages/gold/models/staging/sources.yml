@@ -22,7 +22,8 @@ sources:
             data_tests:
               - not_null
               - accepted_values:
-                  values: ['C', 'H', 'S', 'Y', 'unknown']
+                  arguments:
+                    values: ['C', 'H', 'S', 'Y', 'unknown']
           - name: lots_available
             description: "Count of currently available lots."
             data_tests:
@@ -42,7 +43,8 @@ sources:
             data_tests:
               - not_null
               - accepted_values:
-                  values: ['HDB', 'LTA', 'URA']
+                  arguments:
+                    values: ['HDB', 'LTA', 'URA']
           - name: ingestion_timestamp
             description: "Timestamp when the silver Lambda processed the data."
             data_tests:
@@ -55,4 +57,3 @@ sources:
             description: "Partition month."
           - name: day
             description: "Partition day."
-

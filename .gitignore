@@ -267,3 +267,9 @@ infra/**/*.zip
 
 # temp folder
 tmp/*
+
+# dbt
+target/
+dbt_packages/
+logs/
+.user.yml

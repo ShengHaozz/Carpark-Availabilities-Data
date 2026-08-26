@@ -18,7 +18,8 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['C', 'H', 'S', 'Y', 'unknown']
+              arguments:
+                values: ['C', 'H', 'S', 'Y', 'unknown']
       - name: total_lots
         description: "Total lot capacity for this lot type. Tracked historically in SCD2."
       - name: development
@@ -30,7 +31,8 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['HDB', 'LTA', 'URA']
+              arguments:
+                values: ['HDB', 'LTA', 'URA']
       - name: location_latitude
         description: "Latitude coordinate of the carpark."
       - name: location_longitude
@@ -45,4 +47,3 @@ models:
         description: "Boolean flag: TRUE if this is the currently active version of the carpark record."
         data_tests:
           - not_null
-

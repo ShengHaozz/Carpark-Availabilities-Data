@@ -18,7 +18,8 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['C', 'H', 'S', 'Y', 'unknown']
+              arguments:
+                values: ['C', 'H', 'S', 'Y', 'unknown']
       - name: lots_available
         description: "Count of available lots (non-negative integer)."
         data_tests:
@@ -38,7 +39,8 @@ models:
         data_tests:
           - not_null
           - accepted_values:
-              values: ['HDB', 'LTA', 'URA']
+              arguments:
+                values: ['HDB', 'LTA', 'URA']
       - name: snapshot_timestamp
         description: "UTC timestamp of the snapshot observation."
         data_tests:
@@ -49,4 +51,3 @@ models:
           - not_null
       - name: source_filepath
         description: "Source bronze S3 filepath."
-

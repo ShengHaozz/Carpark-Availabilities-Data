@@ -119,6 +119,15 @@ dbt_debug:
 	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
 	uv run --package gold dbt debug --project-dir packages/gold --profiles-dir packages/gold
 
+dbt_snapshot:
+	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
+	uv run --package gold dbt snapshot --project-dir packages/gold --profiles-dir packages/gold
+
 dbt_run:
 	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
-	uv run --package gold dbt run --project-dir packages/gold --profiles-dir packages/gold
+	uv run --package gold dbt run --project-dir packages/gold --profiles-dir packages/gold
+
+dbt_test:
+	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
+	uv run --package gold dbt test --project-dir packages/gold --profiles-dir packages/gold
+
