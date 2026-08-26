@@ -20,7 +20,7 @@ resource "aws_iam_role" "scheduler_role" {
   })
 }
 
-# Policy to invoke lambda
+# Policy to allow EventBridge Scheduler to put events onto the bus
 resource "aws_iam_role_policy" "scheduler_policy" {
   name = "carpark-scheduler-policy"
   role = aws_iam_role.scheduler_role.name
@@ -35,16 +35,45 @@ resource "aws_iam_role_policy" "scheduler_policy" {
   })
 }
 
+# IAM Role for EventBridge Rule to Start Step Functions Execution
+resource "aws_iam_role" "eventbridge_sfn_role" {
+  name = "eventbridge_step_functions_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "events.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "eventbridge_sfn_policy" {
+  name = "eventbridge-sfn-start-execution"
+  role = aws_iam_role.eventbridge_sfn_role.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "states:StartExecution"
+      Resource = aws_sfn_state_machine.carpark_daily_pipeline.arn
+    }]
+  })
+}
+
+# --- 10-Minute Schedule for Bronze Pollers ---
 
 resource "aws_scheduler_schedule" "scheduler_10m" {
   name = local.scheduler_10m_name
 
-  # flexible or exact time
   flexible_time_window {
     mode = "OFF"
   }
 
-  # cron expression for every 10 minutes
   schedule_expression = var.schedule_10m
 
   target {
@@ -105,15 +134,15 @@ resource "aws_lambda_permission" "hdb-data" {
   source_arn    = aws_cloudwatch_event_rule.scheduler_10m.arn
 }
 
+# --- Daily Schedule for Step Functions Pipeline (Silver -> Gold) ---
+
 resource "aws_scheduler_schedule" "scheduler_1d" {
   name = local.scheduler_1d_name
 
-  # flexible or exact time
   flexible_time_window {
     mode = "OFF"
   }
 
-  # cron expression for every 10 minutes
   schedule_expression = var.schedule_1d
 
   target {
@@ -142,21 +171,17 @@ resource "aws_cloudwatch_event_rule" "scheduler_1d" {
   })
 }
 
-resource "aws_cloudwatch_event_target" "silver-cold" {
+# Target Step Functions Daily State Machine
+resource "aws_cloudwatch_event_target" "daily_pipeline_sfn" {
   rule           = aws_cloudwatch_event_rule.scheduler_1d.name
   event_bus_name = aws_cloudwatch_event_bus.main.name
 
-  target_id = "silver-cold"
-  arn       = module.silver_lambda.functions["silver_cold"].arn
+  target_id = "carpark-daily-pipeline-sfn"
+  arn       = aws_sfn_state_machine.carpark_daily_pipeline.arn
+  role_arn  = aws_iam_role.eventbridge_sfn_role.arn
 }
 
-resource "aws_lambda_permission" "silver-cold" {
-  statement_id  = "AllowEventRule"
-  action        = "lambda:InvokeFunction"
-  function_name = module.silver_lambda.functions["silver_cold"].function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.scheduler_1d.arn
-}
+# --- Event Bus Logging ---
 
 resource "aws_cloudwatch_log_group" "eventbridge_bus_log" {
   name              = "/aws/events/carpark-events-log"
