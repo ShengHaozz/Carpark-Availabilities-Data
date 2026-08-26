@@ -16,7 +16,7 @@ flowchart TD
     end
 
     subgraph Bronze ["Bronze Layer (Raw JSON)"]
-        EB_Bronze["EventBridge Scheduler\n(Every 10 mins)"]
+        EB_Bronze["EventBridge Scheduler (scheduler_10m)\n(Every 10 mins)"]
         Lambda_LTA["lta_poller Lambda"]
         Lambda_HDB["hdb_poller Lambda"]
         S3_Bronze[("S3: level=bronze/\nsource={lta|hdb}/\nyear/month/day/hour/*.json")]
@@ -27,30 +27,36 @@ flowchart TD
         Lambda_LTA & Lambda_HDB --> S3_Bronze
     end
 
+    subgraph DailyOrchestration ["Daily Orchestration (AWS Step Functions)"]
+        EB_Silver["EventBridge Scheduler (scheduler_1d)\n(Daily at 00:05 UTC)"]
+        SFN["AWS Step Functions State Machine\n(carpark-daily-pipeline)"]
+        
+        EB_Silver --> SFN
+    end
+
     subgraph Silver ["Silver Layer (Partitioned Parquet)"]
-        EB_Silver["EventBridge Scheduler\n(Daily Batch at 00:00 UTC)"]
-        Lambda_Silver["silver_cold Lambda\n(Docker ARM64 / PyArrow)"]
+        Lambda_Silver["Step 1: silver_cold Lambda\n(Docker ARM64 / PyArrow)"]
         S3_Silver[("S3: level=silver/\nyear/month/day/\nsilver_cold.parquet")]
         Glue_Silver["AWS Glue Catalog\n(Database: silver, Table: silver_cold\nwith Partition Projection)"]
 
-        EB_Silver --> Lambda_Silver
+        SFN -->|Task 1| Lambda_Silver
         S3_Bronze --> Lambda_Silver
         Lambda_Silver --> S3_Silver
         S3_Silver -.-> Glue_Silver
     end
 
     subgraph Gold ["Gold Layer (Dimensional & Fact Iceberg Models)"]
+        Lambda_Gold["Step 2: gold_dbt Lambda\n(Docker ARM64 / dbtRunner)"]
         Athena["Amazon Athena Engine"]
-        DBT["dbt-athena (packages/gold)"]
         Snapshots["snp_carpark\n(SCD Type 2 Snapshot)"]
         DimCarpark["dim_carpark\n(SCD2 Dimension)"]
         FctAvailability["fct_lot_availability\n(Daily Partitioned Fact)"]
         S3_Gold[("S3: gold/\nIceberg Tables")]
 
-        Glue_Silver --> Athena
-        Athena --> DBT
-        DBT --> Snapshots --> DimCarpark
-        DBT --> FctAvailability
+        Lambda_Silver -->|Task 2 on Success| Lambda_Gold
+        Lambda_Gold --> Athena
+        Athena --> Snapshots --> DimCarpark
+        Athena --> FctAvailability
         DimCarpark & FctAvailability --> S3_Gold
     end
 ```
@@ -73,13 +79,13 @@ The project is structured as a Python monorepo using [`uv` workspaces](https://d
 ├── infra/                       # Terraform infrastructure definitions
 │   ├── bootstrap/               # IAM roles (bootstrap, ecr-builder, app-builder)
 │   ├── ecr/                     # AWS ECR repository management
-│   └── app/                     # S3, Lambda, EventBridge, and Glue definitions
+│   └── app/                     # S3, Lambda, EventBridge, Step Functions, Glue
 └── packages/                    # Python and dbt sub-packages
     ├── lta_poller/              # Lambda: Ingest LTA DataMall availability data
     ├── hdb_poller/              # Lambda: Ingest Data.gov.sg HDB availability data
-    ├── silver_cold/             # Lambda: Batch process raw Bronze into Silver Parquet
+    ├── silver_cold/             # Lambda: Batch process raw Bronze into Silver Parquet (Docker ARM64)
     ├── silver_hot/              # Lambda: Near real-time processing (future)
-    └── gold/                    # dbt project (Athena / Iceberg models & tests)
+    └── gold/                    # Lambda + dbt: Automated dbt snapshot/run/test on Athena & Iceberg (Docker ARM64)
 ```
 
 ---
@@ -127,7 +133,7 @@ APP_BUILDER_PROFILE="app-builder"
 The deployment uses least-privilege IAM profiles configured automatically:
 * `bootstrap`: Used to initialize infrastructure and create specific deployment roles.
 * `ecr-builder`: Scoped permissions to create and push Docker images to Amazon ECR.
-* `app-builder`: Permissions to provision S3, Lambda, Glue, and EventBridge resources.
+* `app-builder`: Permissions to provision S3, Lambda, Step Functions, Glue, and EventBridge resources.
 
 Run the profile bootstrap target:
 ```bash
@@ -157,6 +163,20 @@ uv run mypy packages/
 uv run pytest
 ```
 
+### 5.2 dbt Validation Commands
+```bash
+# Fast local compilation check (validates SQL/Jinja/YAML without querying AWS)
+make dbt_parse
+
+# Test Athena connection and S3 bucket permissions
+make dbt_debug
+
+# Execute snapshots, runs, and data quality tests locally
+make dbt_snapshot
+make dbt_run
+make dbt_test
+```
+
 ---
 
 ## 6. Build & Deployment Lifecycle
@@ -173,7 +193,7 @@ make bootstrap
 # 3. Create the Amazon ECR Repository
 make ecr_up
 
-# 4. Build Docker container images for Lambda (ARM64 architecture)
+# 4. Build Docker container images for Lambda (ARM64 architecture for silver_cold & gold)
 make build
 
 # 5. Push Docker container images to ECR
@@ -189,5 +209,4 @@ make deploy
 
 * **[Bronze Layer Guide](bronze.md)**: Poller Lambdas, external APIs, pagination, rate limiting, and S3 raw JSON storage.
 * **[Silver Layer Guide](silver.md)**: Daily batch transformation, Pydantic schema validation, PyArrow Parquet writer, and Glue external table with partition projection.
-* **[Gold Layer Guide](gold.md)**: dbt project configuration, Athena / Iceberg models, SCD Type 2 snapshots, fact tables, and data quality tests.
-
+* **[Gold Layer Guide](gold.md)**: Containerized dbt runner, Step Functions daily pipeline orchestration, Athena / Iceberg models, SCD Type 2 snapshots, fact tables, and data quality tests.

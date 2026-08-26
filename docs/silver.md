@@ -8,6 +8,7 @@ The **Silver Layer** is the cleansed, normalized, and validated tier of the Carp
 
 * **Format**: Apache Parquet with **ZSTD** compression.
 * **Execution Model**: Containerized AWS Lambda function (`silver_cold`) running on ARM64 architecture.
+* **Orchestration**: Triggered as **Step 1** in the daily **AWS Step Functions State Machine** (`carpark-daily-pipeline`).
 * **Processing Pattern**: Daily batch reconciliation covering the previous 24 hours of Bronze data (`00:00` to `23:50` UTC).
 * **Streaming Writes**: Streams Parquet row groups hour-by-hour using `pyarrow.fs.S3FileSystem` and `pyarrow.parquet.ParquetWriter` to keep Lambda memory usage minimal (< 512 MB).
 * **Catalog Registration**: Managed in the AWS Glue Data Catalog (`silver.silver_cold`) with **Partition Projection** enabled.
@@ -20,7 +21,8 @@ The batch transformer (`packages/silver_cold/src/silver_cold/handler.py`) perfor
 
 ```mermaid
 flowchart TD
-    A["EventBridge Daily Trigger\n(Previous Day: year/month/day)"] --> B["Iterate Hours 00 to 23"]
+    SFN["Step Functions: carpark-daily-pipeline\n(Task 1: TransformSilver)"] --> A["Read Payload (Time/Date Window)"]
+    A --> B["Iterate Hours 00 to 23"]
     B --> C["Fetch Bronze LTA Snapshots (S3)"]
     B --> D["Fetch Bronze HDB Snapshots (S3)"]
     C & D --> E["Pydantic Validation\n(DatamallCarparkAvailability, HDBCarparkData)"]
@@ -29,6 +31,7 @@ flowchart TD
     F & G --> H["Build PyArrow Table Chunk"]
     H --> I["Stream chunk to S3 ParquetWriter\n(ZSTD Compression)"]
     I --> J[("S3: level=silver/year=YYYY/month=MM/day=DD/silver_cold.parquet")]
+    J --> K["Return Success to Step Functions"]
 ```
 
 ### 2.1 Coordinate Parsing
@@ -107,4 +110,3 @@ docker build --platform linux/arm64 -t <ACCOUNT_ID>.dkr.ecr.ap-southeast-1.amazo
 # Deploy via Makefile
 make deploy
 ```
-

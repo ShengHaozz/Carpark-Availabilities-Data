@@ -4,61 +4,65 @@ The **Gold Layer** is the analytical and dimensional modeling tier of the Carpar
 
 ---
 
-## 1. Overview & Objectives
+## 1. Overview & Architecture
 
 * **Data Modeling Paradigm**: Star Schema with Slowly Changing Dimensions (SCD Type 2).
 * **Storage Engine**: Apache Iceberg tables in S3 (providing ACID transactions, snapshot isolation, and partition evolution).
-* **Orchestration / Modeling Tool**: [dbt](https://www.getdbt.com/) (`packages/gold`).
+* **Orchestration**: Triggered as **Step 2** in the daily **AWS Step Functions State Machine** (`carpark-daily-pipeline`) immediately following successful Silver consolidation.
+* **Execution Environment**: Containerized AWS Lambda function (`gold_dbt`) running Python 3.13 on ARM64 Graviton architecture.
 * **Query Engine**: Amazon Athena (`ap-southeast-1`, `awsdatacatalog`).
 
 ```mermaid
 flowchart TD
-    SilverCold["Glue Table: silver.silver_cold\n(S3 Parquet)"] --> Staging["stg_silver__carpark_snapshots\n(Athena View)"]
+    SFN["AWS Step Functions\n(carpark-daily-pipeline)"] -->|Task 1: Success| LambdaGold["Task 2: gold_dbt Lambda\n(packages/gold/src/gold/handler.py)"]
     
-    subgraph Dimension Modeling ["Dimension Pipeline (SCD Type 2)"]
-        Staging --> Snpshot["snp_carpark\n(dbt Snapshot / Check Strategy)"]
-        Snpshot --> DimCarpark["dim_carpark\n(Iceberg Table / SCD2)"]
-    end
-    
-    subgraph Fact Modeling ["Fact Pipeline"]
-        Staging --> FctAvailability["fct_lot_availability\n(Incremental Iceberg Table\nPartitioned by snapshot_date)"]
-        DimCarpark -.->|Point-in-Time Join\nvalid_from <= t < valid_to| FctAvailability
+    subgraph Lambda Execution ["Lambda Container (/tmp/dbt)"]
+        Setup["Copy dbt project to /tmp/dbt"] --> DbtSnap["dbtRunner: snapshot\n(snp_carpark on last 7 days)"]
+        DbtSnap --> DbtRun["dbtRunner: run\n(stg_silver -> dim_carpark -> fct_lot_availability)"]
+        DbtRun --> DbtTest["dbtRunner: test\n(Schema tests & custom SQL assertions)"]
     end
 
-    subgraph Tests ["Data Quality Test Suite"]
-        DimCarpark --> TestGeo["assert_singapore_geo_bounds"]
-        DimCarpark --> TestSCD["assert_scd2_no_overlaps"]
-        FctAvailability --> TestLots["assert_lots_available_le_total_lots"]
-        FctAvailability --> TestOccupancy["assert_occupancy_rate_bounds"]
-    end
+    LambdaGold --> Setup
+    DbtSnap & DbtRun & DbtTest --> Athena["Amazon Athena & Glue Catalog"]
+    Athena --> S3Gold[("S3: gold/\nIceberg Tables")]
 ```
 
 ---
 
-## 2. Model Architecture
+## 2. Containerized Lambda Execution (`gold_dbt`)
 
-### 2.1 Staging View: `stg_silver__carpark_snapshots`
+AWS Lambda file systems are read-only except for `/tmp`. The Gold Lambda handler (`packages/gold/src/gold/handler.py`):
+1. Copies the dbt project structure (`models/`, `snapshots/`, `tests/`, `macros/`, `dbt_project.yml`, `profiles.yml`) into `/tmp/dbt`.
+2. Programmatically executes dbt commands in sequence using `dbtRunner`:
+   - `dbt snapshot --project-dir /tmp/dbt --profiles-dir /tmp/dbt`
+   - `dbt run --project-dir /tmp/dbt --profiles-dir /tmp/dbt`
+   - `dbt test --project-dir /tmp/dbt --profiles-dir /tmp/dbt`
+3. Captures run results and raises an execution error on any failed stage or test failure, causing the Step Functions state machine to fail and raise CloudWatch alerts.
+
+---
+
+## 3. Dimensional Data Models
+
+### 3.1 Staging View: `stg_silver__carpark_snapshots`
 * **File**: [`models/staging/stg_silver__carpark_snapshots.sql`](file:///c:/Users/sheng/OneDrive/Documents/Carpark-Availabilities-Data/packages/gold/models/staging/stg_silver__carpark_snapshots.sql)
 * **Materialization**: `view` (Schema: `staging`)
-* **Key Operations**:
-  * Casts types and trims text fields.
-  * Generates surrogate primary key `snapshot_id = md5(carpark_id | lot_type | snapshot_timestamp)`.
-  * Normalizes missing coordinates and values.
+* **Purpose**: Deduplicates and cleans raw snapshots from `silver.silver_cold` taking the latest record per `(carpark_id, lot_type, snapshot_timestamp)`.
+* **Key Columns**: Generates surrogate key `snapshot_id = to_hex(md5(to_utf8(concat(carpark_id, '|', lot_type, '|', cast(snapshot_timestamp as varchar)))))`.
 
 ---
 
-### 2.2 Dimension Snapshot: `snp_carpark`
+### 3.2 Dimension Snapshot: `snp_carpark`
 * **File**: [`snapshots/snp_carpark.sql`](file:///c:/Users/sheng/OneDrive/Documents/Carpark-Availabilities-Data/packages/gold/snapshots/snp_carpark.sql)
 * **Strategy**: `check` on `['total_lots', 'development', 'area', 'agency', 'location_latitude', 'location_longitude']`
-* **Unique Key**: `md5(carpark_id | lot_type)`
-* **Purpose**: Captures changes over time when carpark capacity is upgraded, coordinates are remapped, or names/developments change.
+* **Unique Key**: `to_hex(md5(to_utf8(concat(carpark_id, '|', lot_type))))`
+* **Performance Optimization**: Narrows scan window to the last 7 days (`snapshot_timestamp >= current_timestamp - interval '7' day`) to optimize Athena query performance and cost while capturing all active carpark state transitions.
 
 ---
 
-### 2.3 Dimension Table: `dim_carpark`
+### 3.3 Dimension Table: `dim_carpark`
 * **File**: [`models/dimensions/dim_carpark.sql`](file:///c:/Users/sheng/OneDrive/Documents/Carpark-Availabilities-Data/packages/gold/models/dimensions/dim_carpark.sql)
-* **Materialization**: `incremental` (Iceberg Table, Merge Strategy)
-* **Primary Key**: `carpark_key = md5(carpark_id | lot_type | dbt_valid_from)`
+* **Materialization**: `incremental` (Apache Iceberg Table, merge strategy)
+* **Primary Key**: `carpark_key = to_hex(md5(to_utf8(concat(carpark_id, '|', lot_type, '|', cast(dbt_valid_from as varchar)))))`
 * **Columns**:
   * `carpark_key` (Surrogate Key)
   * `carpark_id` (Natural ID)
@@ -73,9 +77,9 @@ flowchart TD
 
 ---
 
-### 2.4 Fact Table: `fct_lot_availability`
+### 3.4 Fact Table: `fct_lot_availability`
 * **File**: [`models/facts/fct_lot_availability.sql`](file:///c:/Users/sheng/OneDrive/Documents/Carpark-Availabilities-Data/packages/gold/models/facts/fct_lot_availability.sql)
-* **Materialization**: `incremental` (Iceberg Table, Partitioned by `snapshot_date`)
+* **Materialization**: `incremental` (Apache Iceberg Table, partitioned by `snapshot_date`)
 * **Primary Key**: `availability_id`
 * **Point-in-Time Join**: Joins snapshots to `dim_carpark` where:
   ```sql
@@ -89,43 +93,52 @@ flowchart TD
 
 ---
 
-## 3. Data Quality & Assertion Tests
+## 4. Data Quality & Assertion Tests
 
-Custom SQL tests in [`tests/`](file:///c:/Users/sheng/OneDrive/Documents/Carpark-Availabilities-Data/packages/gold/tests/) enforce domain integrity:
+Custom SQL tests in [`tests/`](file:///c:/Users/sheng/OneDrive/Documents/Carpark-Availabilities-Data/packages/gold/tests/) enforce domain integrity on every execution:
 
 | Test Name | File | Rule Enforced |
 | :--- | :--- | :--- |
 | **Singapore Geo Bounds** | `assert_singapore_geo_bounds.sql` | Carpark coordinates must fall within Singapore bounds ($1.15 \le \text{Lat} \le 1.48$, $103.55 \le \text{Lon} \le 104.10$). |
 | **Capacity Constraint** | `assert_lots_available_le_total_lots.sql` | `lots_available` must never exceed `total_lots` when `total_lots` is defined. |
 | **Occupancy Rate Range** | `assert_occupancy_rate_bounds.sql` | `occupancy_rate` must be within $[0.0, 1.0]$ ($0\%$ to $100\%$). |
-| **SCD2 Overlap Check** | `assert_scd2_no_overlaps.sql` | No overlapping `valid_from` to `valid_to` intervals for any `(carpark_id, lot_type)`. |
+| **SCD2 Overlap Check** | `assert_scd2_no_overlaps.sql` | No overlapping `[valid_from, valid_to)` intervals for any `(carpark_id, lot_type)`. |
 
 ---
 
-## 4. dbt Commands & Local Execution
+## 5. Local Development & Makefile Commands
 
-The project root Makefile exposes convenience targets to run dbt tasks using `uv`:
+The root Makefile provides convenience targets for local testing with `uv`:
 
 ```bash
-# 1. Test Athena connection and S3 bucket permissions
+# 1. Fast local compilation check (validates SQL/Jinja/YAML without querying Athena)
+make dbt_parse
+
+# 2. Test Athena connection and S3 bucket permissions
 make dbt_debug
 
-# 2. Execute SCD Type 2 snapshot
+# 3. Execute SCD Type 2 snapshot
 make dbt_snapshot
 
-# 3. Build staging views, dimensions, and facts
+# 4. Build staging views, dimensions, and facts
 make dbt_run
 
-# 4. Run full suite of generic schema tests and custom SQL assertions
+# 5. Run full suite of generic schema tests and custom SQL assertions
 make dbt_test
 ```
 
-### Direct dbt CLI commands:
+---
+
+## 6. Manual Step Functions Execution
+
+To trigger the full daily pipeline (Silver $\rightarrow$ Gold) manually via AWS CLI:
+
 ```bash
-# Run a specific model
-uv run --package gold dbt run --project-dir packages/gold --select dim_carpark
+# Get the state machine ARN from Terraform
+SFN_ARN=$(terraform -chdir=infra/app output -raw step_function_arn)
 
-# Run only singular data quality tests
-uv run --package gold dbt test --project-dir packages/gold --select test_type:singular
+# Trigger execution
+aws stepfunctions start-execution \
+  --state-machine-arn "$SFN_ARN" \
+  --name "manual-run-$(date +%s)"
 ```
-
