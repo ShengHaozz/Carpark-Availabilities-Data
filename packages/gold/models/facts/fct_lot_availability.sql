@@ -21,10 +21,7 @@ dim_carparks as (
 joined as (
     select
         s.snapshot_id as availability_id,
-        coalesce(
-            d.carpark_key,
-            to_hex(md5(to_utf8(concat(s.carpark_id, '|', s.lot_type, '|unknown'))))
-        ) as carpark_key,
+        d.carpark_key,
         s.carpark_id,
         s.lot_type,
         s.snapshot_timestamp,
