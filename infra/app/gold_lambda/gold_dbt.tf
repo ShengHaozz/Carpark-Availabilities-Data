@@ -129,9 +129,9 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
         Resource = [
           "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
           "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/silver",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/gold",
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/prod_*",
           "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/silver/*",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/gold/*"
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/prod_*/*"
         ]
       },
       {
@@ -148,8 +148,8 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
         ]
         Resource = [
           "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/gold",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/gold/*"
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/prod_*",
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/prod_*/*"
         ]
       }
     ]

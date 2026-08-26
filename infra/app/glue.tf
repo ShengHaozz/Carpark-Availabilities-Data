@@ -3,8 +3,13 @@ resource "aws_glue_catalog_database" "silver" {
   description = "Glue Catalog database for Silver Layer parquet tables"
 }
 
-resource "aws_glue_catalog_database" "gold" {
-  name        = "gold"
+resource "aws_glue_catalog_database" "prod_staging" {
+  name        = "prod_staging"
+  description = "Glue Catalog database for Gold Staging Layer views"
+}
+
+resource "aws_glue_catalog_database" "prod_gold" {
+  name        = "prod_gold"
   description = "Glue Catalog database for Gold Layer dimensional Iceberg tables"
 }
 
