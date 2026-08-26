@@ -1,6 +1,9 @@
 # -- build package --
 FROM public.ecr.aws/lambda/python:3.14 AS build
 
+# Install build tools needed for C-extensions (e.g. mmh3)
+RUN dnf install -y gcc && dnf clean all
+
 RUN pip install --no-cache-dir uv
 
 WORKDIR /build
@@ -27,4 +30,3 @@ FROM public.ecr.aws/lambda/python:3.14
 COPY --from=build /asset ${LAMBDA_TASK_ROOT}
 
 CMD [ "gold.handler.handler" ]
-
