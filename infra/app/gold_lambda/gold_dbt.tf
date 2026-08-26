@@ -35,7 +35,8 @@ resource "aws_iam_role_policy" "gold_dbt_s3_policy" {
         Effect = "Allow"
         Action = [
           "s3:ListBucket",
-          "s3:GetBucketLocation"
+          "s3:GetBucketLocation",
+          "s3:ListBucketMultipartUploads"
         ]
         Resource = [
           var.s3_bucket.arn
@@ -57,11 +58,13 @@ resource "aws_iam_role_policy" "gold_dbt_s3_policy" {
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          "s3:DeleteObject"
+          "s3:DeleteObject",
+          "s3:AbortMultipartUpload",
+          "s3:ListMultipartUploadParts"
         ]
         Resource = [
-          "${var.s3_bucket.arn}/level=gold/*",
-          "${var.s3_bucket.arn}/athena_query_results/*"
+          "${var.s3_bucket.arn}/gold/*",
+          "${var.s3_bucket.arn}/athena-query-results/*"
         ]
       }
     ]
