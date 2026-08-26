@@ -2,7 +2,7 @@
 
 {{
     config(
-      target_schema='gold',
+      target_schema='prod_gold',
       unique_key="to_hex(md5(to_utf8(concat(carpark_id, '|', lot_type))))",
       strategy='check',
       check_cols=['total_lots', 'development', 'area', 'agency', 'location_latitude', 'location_longitude'],

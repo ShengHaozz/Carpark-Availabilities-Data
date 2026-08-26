@@ -135,9 +135,11 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
         ]
       },
       {
-        Sid    = "GlueGoldTableManagement"
+        Sid    = "GlueGoldTableAndDatabaseManagement"
         Effect = "Allow"
         Action = [
+          "glue:CreateDatabase",
+          "glue:UpdateDatabase",
           "glue:CreateTable",
           "glue:UpdateTable",
           "glue:DeleteTable",
