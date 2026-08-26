@@ -74,7 +74,7 @@ def test_handler_dev_mode(tmp_path: Path, monkeypatch):
         assert response["status"] == "SUCCESS"
         assert response["stages"]["build"] == "SUCCESS"
         mock_setup.assert_called_once_with(tmp_path)
-        mock_run.assert_called_once_with(tmp_path)
+        mock_run.assert_called_once_with(tmp_path, full_refresh=False)
 
 
 def test_handler_prod_mode(tmp_path: Path, monkeypatch):
@@ -92,11 +92,47 @@ def test_handler_prod_mode(tmp_path: Path, monkeypatch):
             "build": "SUCCESS",
         }
 
-        response = handler({}, None)
+        response = handler({"full_refresh": True}, None)
 
         assert response["status"] == "SUCCESS"
         mock_setup.assert_called_once_with(tmp_path)
-        mock_run.assert_called_once_with(tmp_path)
+        mock_run.assert_called_once_with(tmp_path, full_refresh=True)
+
+
+def test_handler_eventbridge_event(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("ENV", "prod")
+    monkeypatch.setenv("LAMBDA_TASK_ROOT", str(tmp_path))
+
+    with (
+        patch(
+            "packages.gold.src.gold.handler.setup_dbt_environment",
+            return_value=tmp_path,
+        ) as mock_setup,
+        patch("packages.gold.src.gold.handler.run_dbt_commands") as mock_run,
+    ):
+        mock_run.return_value = {"build": "SUCCESS"}
+
+        # Normal EventBridge scheduled event
+        eb_event = {
+            "version": "0",
+            "id": "d672aef4-324d-a2b2-ed6e-d33ad680abab",
+            "detail-type": "carpark-scheduler",
+            "source": "scheduler_1d",
+            "detail": {"interval": "1d"},
+        }
+        response = handler(eb_event, None)
+        assert response["status"] == "SUCCESS"
+        mock_run.assert_called_with(tmp_path, full_refresh=False)
+
+        # EventBridge full refresh event
+        eb_full_refresh_event = {
+            "version": "0",
+            "detail-type": "carpark-scheduler",
+            "detail": {"full_refresh": True},
+        }
+        response = handler(eb_full_refresh_event, None)
+        assert response["status"] == "SUCCESS"
+        mock_run.assert_called_with(tmp_path, full_refresh=True)
 
 
 def test_multiprocessing_lambda_patch():

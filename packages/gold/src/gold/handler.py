@@ -58,22 +58,24 @@ def setup_dbt_environment(project_src_dir: Path, temp_dir: Path = DBT_TEMP_DIR) 
     return temp_dir
 
 
-def run_dbt_commands(project_dir: Path) -> Dict[str, Any]:
+def run_dbt_commands(project_dir: Path, full_refresh: bool = False) -> Dict[str, Any]:
     """Executes dbt build across the project in topological DAG dependency order."""
     os.environ["DO_NOT_TRACK"] = "1"
     dbt = dbtRunner()
 
+    build_cmd = [
+        "build",
+        "--project-dir",
+        str(project_dir),
+        "--profiles-dir",
+        str(project_dir),
+    ]
+    if full_refresh:
+        logger.info("Executing dbt build with --full-refresh")
+        build_cmd.append("--full-refresh")
+
     stages = [
-        (
-            "build",
-            [
-                "build",
-                "--project-dir",
-                str(project_dir),
-                "--profiles-dir",
-                str(project_dir),
-            ],
-        ),
+        ("build", build_cmd),
     ]
 
     results = {}
@@ -113,7 +115,16 @@ def handler(event: Dict[str, Any] | None = None, context: Any = None) -> Dict[st
     logger.info(f"Source dbt project directory: {package_dir}")
     work_dir = setup_dbt_environment(package_dir)
 
-    results = run_dbt_commands(work_dir)
+    full_refresh = False
+    if isinstance(event, dict):
+        full_refresh = bool(
+            event.get("full_refresh", False)
+            or (
+                isinstance(event.get("detail"), dict)
+                and event["detail"].get("full_refresh", False)
+            )
+        )
+    results = run_dbt_commands(work_dir, full_refresh=full_refresh)
 
     return {
         "status": "SUCCESS",
