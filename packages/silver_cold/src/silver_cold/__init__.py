@@ -2,7 +2,7 @@ from .handler import (
     get_snapshots_from_bucket,
     transform,
     upload_silver_table_parts_to_s3,
-    handler
+    handler,
 )
 
 from .models import (
@@ -11,5 +11,18 @@ from .models import (
     HDBCarparkInfo,
     HDBCarparkData,
     SilverColdCarparkSnapshot,
-    SILVER_PARQUET_SCHEMA
+    SILVER_PARQUET_SCHEMA,
 )
+
+__all__ = [
+    "get_snapshots_from_bucket",
+    "transform",
+    "upload_silver_table_parts_to_s3",
+    "handler",
+    "BronzeSnapshot",
+    "DatamallCarparkAvailability",
+    "HDBCarparkInfo",
+    "HDBCarparkData",
+    "SilverColdCarparkSnapshot",
+    "SILVER_PARQUET_SCHEMA",
+]

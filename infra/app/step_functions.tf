@@ -91,7 +91,7 @@ resource "aws_sfn_state_machine" "carpark_daily_pipeline" {
       TransformSilver = {
         Type       = "Task"
         Resource   = "arn:aws:states:::lambda:invoke"
-        OutputPath = "$.Payload"
+        ResultPath = "$.silver_result"
         Parameters = {
           "FunctionName" = module.silver_lambda.functions["silver_cold"].arn
           "Payload.$"    = "$"
@@ -121,7 +121,7 @@ resource "aws_sfn_state_machine" "carpark_daily_pipeline" {
       RunGoldDbt = {
         Type       = "Task"
         Resource   = "arn:aws:states:::lambda:invoke"
-        OutputPath = "$.Payload"
+        ResultPath = "$.gold_result"
         Parameters = {
           "FunctionName" = module.gold_lambda.functions["gold_dbt"].arn
           "Payload.$"    = "$"

@@ -1,17 +1,17 @@
 import pytest
-import pyarrow as pa
 from datetime import datetime
 from packages.silver_cold.src.silver_cold import (
-    get_snapshots_from_bucket,
     transform,
-    upload_silver_table_parts_to_s3,
     handler,
     SilverColdCarparkSnapshot,
-    SILVER_PARQUET_SCHEMA
+    SILVER_PARQUET_SCHEMA,
 )
 
+
 class Test_Silver_Cold:
-    def test_transform_indiv_snapshot(self, lta_bronze_snapshot_generator, hdb_bronze_snapshot_generator):
+    def test_transform_indiv_snapshot(
+        self, lta_bronze_snapshot_generator, hdb_bronze_snapshot_generator
+    ):
         snapshot_count = 1
         data_count = 2
 
@@ -40,8 +40,7 @@ class Test_Silver_Cold:
 
         # Test silver model
         rows = [
-            SilverColdCarparkSnapshot.model_validate(row)
-            for row in table.to_pylist()
+            SilverColdCarparkSnapshot.model_validate(row) for row in table.to_pylist()
         ]
         assert len(rows) == snapshot_count * data_count
 
@@ -53,20 +52,12 @@ class Test_Silver_Cold:
             carpark_id = row.carpark_id
 
             lta_value = next(
-                (
-                    value
-                    for value in lta_values
-                    if value.CarParkID == carpark_id
-                ),
+                (value for value in lta_values if value.CarParkID == carpark_id),
                 None,
             )
 
             hdb_value = next(
-                (
-                    value
-                    for value in hdb_values
-                    if value.carpark_number == carpark_id
-                ),
+                (value for value in hdb_values if value.carpark_number == carpark_id),
                 None,
             )
 
@@ -84,13 +75,9 @@ class Test_Silver_Cold:
             # Test LTA values
             latitude, longitude = lta_value.Location.split()
 
-            assert row.location_latitude == pytest.approx(
-                float(latitude)
-            )
+            assert row.location_latitude == pytest.approx(float(latitude))
 
-            assert row.location_longitude == pytest.approx(
-                float(longitude)
-            )
+            assert row.location_longitude == pytest.approx(float(longitude))
 
             assert row.area == lta_value.Area
             assert row.development == lta_value.Development
@@ -101,8 +88,7 @@ class Test_Silver_Cold:
 
             # Test ingestion timestamp comes from the transform argument
             assert row.ingestion_timestamp == ingestion_timestamp
-            
-    
+
     def test_transform_multiple_snapshots(
         self,
         lta_bronze_snapshot_generator,
@@ -137,8 +123,7 @@ class Test_Silver_Cold:
 
         # Test silver model
         rows = [
-            SilverColdCarparkSnapshot.model_validate(row)
-            for row in table.to_pylist()
+            SilverColdCarparkSnapshot.model_validate(row) for row in table.to_pylist()
         ]
 
         assert len(rows) == snapshot_count * data_count
@@ -151,9 +136,7 @@ class Test_Silver_Cold:
 
             # Find all Silver rows belonging to this snapshot
             snapshot_rows = [
-                row
-                for row in rows
-                if row.snapshot_timestamp == snapshot_timestamp
+                row for row in rows if row.snapshot_timestamp == snapshot_timestamp
             ]
 
             assert len(snapshot_rows) == data_count
@@ -167,16 +150,12 @@ class Test_Silver_Cold:
 
                 # Find corresponding HDB record
                 hdb_value = next(
-                    value
-                    for value in hdb_values
-                    if value.carpark_number == carpark_id
+                    value for value in hdb_values if value.carpark_number == carpark_id
                 )
 
                 # Find corresponding Silver record
                 silver_row = next(
-                    row
-                    for row in snapshot_rows
-                    if row.carpark_id == carpark_id
+                    row for row in snapshot_rows if row.carpark_id == carpark_id
                 )
 
                 # -------------------------
@@ -197,13 +176,9 @@ class Test_Silver_Cold:
 
                 latitude, longitude = lta_value.Location.split()
 
-                assert silver_row.location_latitude == pytest.approx(
-                    float(latitude)
-                )
+                assert silver_row.location_latitude == pytest.approx(float(latitude))
 
-                assert silver_row.location_longitude == pytest.approx(
-                    float(longitude)
-                )
+                assert silver_row.location_longitude == pytest.approx(float(longitude))
 
                 assert silver_row.area == lta_value.Area
                 assert silver_row.development == lta_value.Development
@@ -219,10 +194,7 @@ class Test_Silver_Cold:
                 assert silver_row.snapshot_timestamp == snapshot_timestamp
 
         # Test ingestion timestamp
-        assert all(
-            row.ingestion_timestamp == ingestion_timestamp
-            for row in rows
-        )
+        assert all(row.ingestion_timestamp == ingestion_timestamp for row in rows)
 
     def test_transform_missing_lta_snapshots(
         self,
@@ -245,9 +217,7 @@ class Test_Silver_Cold:
         # Remove 2 LTA snapshots
         lta_snapshots = lta_snapshots[:2]
 
-        ingestion_timestamp = datetime.fromisoformat(
-            "2026-08-11T09:00:13.432756+00:00"
-        )
+        ingestion_timestamp = datetime.fromisoformat("2026-08-11T09:00:13.432756+00:00")
 
         table = transform(
             lta_snapshots=lta_snapshots,
@@ -263,8 +233,7 @@ class Test_Silver_Cold:
 
         # Test silver model
         rows = [
-            SilverColdCarparkSnapshot.model_validate(row)
-            for row in table.to_pylist()
+            SilverColdCarparkSnapshot.model_validate(row) for row in table.to_pylist()
         ]
 
         assert len(rows) == (snapshot_count - 2) * data_count
@@ -289,13 +258,9 @@ class Test_Silver_Cold:
 
             latitude, longitude = lta_value.Location.split()
 
-            assert row.location_latitude == pytest.approx(
-                float(latitude)
-            )
+            assert row.location_latitude == pytest.approx(float(latitude))
 
-            assert row.location_longitude == pytest.approx(
-                float(longitude)
-            )
+            assert row.location_longitude == pytest.approx(float(longitude))
 
             assert row.area == lta_value.Area
             assert row.development == lta_value.Development
@@ -324,10 +289,7 @@ class Test_Silver_Cold:
             assert row.snapshot_timestamp == lta_snapshot.timestamp
 
         # Test ingestion timestamp
-        assert all(
-            row.ingestion_timestamp == ingestion_timestamp
-            for row in rows
-        )
+        assert all(row.ingestion_timestamp == ingestion_timestamp for row in rows)
 
     def test_transform_missing_hdb_snapshots(
         self,
@@ -350,9 +312,7 @@ class Test_Silver_Cold:
         # Remove 2 HDB snapshots
         hdb_snapshots = hdb_snapshots[1:3]
 
-        ingestion_timestamp = datetime.fromisoformat(
-            "2026-08-11T09:00:13.432756+00:00"
-        )
+        ingestion_timestamp = datetime.fromisoformat("2026-08-11T09:00:13.432756+00:00")
 
         table = transform(
             lta_snapshots=lta_snapshots,
@@ -368,18 +328,13 @@ class Test_Silver_Cold:
 
         # Test silver model
         rows = [
-            SilverColdCarparkSnapshot.model_validate(row)
-            for row in table.to_pylist()
+            SilverColdCarparkSnapshot.model_validate(row) for row in table.to_pylist()
         ]
 
         assert len(rows) == snapshot_count * data_count
 
         # Find rows where HDB data is missing
-        missing_hdb_rows = [
-            row
-            for row in rows
-            if row.total_lots is None
-        ]
+        missing_hdb_rows = [row for row in rows if row.total_lots is None]
 
         # Test 2 missing HDB snapshots x 2 rows
         assert len(missing_hdb_rows) == 2 * data_count
@@ -409,6 +364,40 @@ class Test_Silver_Cold:
         expected_ingestion_timestamp = ingestion_timestamp
 
         assert all(
-            row.ingestion_timestamp == expected_ingestion_timestamp
-            for row in rows
+            row.ingestion_timestamp == expected_ingestion_timestamp for row in rows
         )
+
+    def test_handler_returns_non_empty_success_dict(self, monkeypatch):
+        """
+        Verifies that silver_cold.handler returns a valid dictionary response
+        (not None/null) so Step Functions does not fail downstream states
+        with 'Unable to apply Path transformation to null or empty input'.
+        """
+        monkeypatch.setenv("BUCKET_NAME", "test-bucket")
+        monkeypatch.setenv("INPUT_LEVEL", "bronze")
+        monkeypatch.setenv("LTA_SOURCE", "lta")
+        monkeypatch.setenv("HDB_SOURCE", "hdb")
+        monkeypatch.setenv("OUTPUT_LEVEL", "silver")
+
+        from unittest.mock import patch
+
+        with (
+            patch("boto3.client"),
+            patch(
+                "packages.silver_cold.src.silver_cold.handler.get_snapshots_from_bucket",
+                return_value=[],
+            ),
+            patch(
+                "packages.silver_cold.src.silver_cold.handler.upload_silver_table_parts_to_s3"
+            ),
+        ):
+            event = {"time": "2026-08-15T00:05:00Z"}
+            result = handler(event, None)
+
+            assert result is not None, "handler must not return None"
+            assert isinstance(result, dict), (
+                "handler must return a dict for Step Functions"
+            )
+            assert result.get("status") == "SUCCESS"
+            assert result.get("processed_date") == "2026-08-14"
+            assert result.get("level") == "silver"

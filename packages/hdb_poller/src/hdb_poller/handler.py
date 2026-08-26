@@ -13,12 +13,11 @@ LEVEL = os.environ["LEVEL"]
 SOURCE = os.environ["SOURCE"]
 MAX_TRIES = 3
 
+
 def handler(event, context):
     s3 = boto3.client("s3")
 
-    req = urllib.request.Request(
-        ENDPOINT
-    )
+    req = urllib.request.Request(ENDPOINT)
 
     tries = 1
 
@@ -28,50 +27,45 @@ def handler(event, context):
         if tries > MAX_TRIES:
             print(f"Exceeded {MAX_TRIES}, skipping")
             return
-        
+
         print(f"Attempt {tries}")
 
-        try:  
-            req = urllib.request.Request(
-                ENDPOINT
-            )
+        try:
+            req = urllib.request.Request(ENDPOINT)
             with urllib.request.urlopen(req) as response:
                 data = json.loads(response.read())
-            
+
             values = data.get("items", [{}])[0].get("carpark_data", [])
 
             break
         except HTTPError as e:
             print(f"HTTP {e.code}: {e.reason}")
-            
-            if e.code == 429: # Rate Limit Exceeded
-                retry_after_s = e.headers.get("Retry-After", 10 * (tries ** 2))
+
+            if e.code == 429:  # Rate Limit Exceeded
+                retry_after_s = e.headers.get("Retry-After", 10 * (tries**2))
                 print(f"Retrying after {retry_after_s}s")
                 time.sleep(retry_after_s)
                 tries += 1
                 continue
 
             return
-            
 
         except Exception as e:
             print(f"Exception occured: {e}")
-            retry_after_s = 10 * (tries ** 2)
+            retry_after_s = 10 * (tries**2)
             print(f"Retrying after {retry_after_s}s")
             time.sleep(retry_after_s)
             tries += 1
             continue
-    
+
     poll_end = datetime.now(timezone.utc)
 
-
-    
     ref_date = poll_start - timedelta(
-        minutes = poll_start.minute % 10,
-        seconds = poll_start.second,
-        microseconds = poll_start.microsecond
-    ) # floor to 10 minutes
-    
+        minutes=poll_start.minute % 10,
+        seconds=poll_start.second,
+        microseconds=poll_start.microsecond,
+    )  # floor to 10 minutes
+
     key = (
         f"level={LEVEL}/"
         f"source={SOURCE}/"
@@ -83,21 +77,21 @@ def handler(event, context):
     )
 
     snapshot = {
-        "timestamp" : ref_date.isoformat(),
-        "source" : SOURCE,
-        "poll_start" : poll_start.isoformat(),
-        "poll_end" : poll_end.isoformat(),
-        "pages" : 1,
-        "records_count" : len(values),
-        "value" : values
+        "timestamp": ref_date.isoformat(),
+        "source": SOURCE,
+        "poll_start": poll_start.isoformat(),
+        "poll_end": poll_end.isoformat(),
+        "pages": 1,
+        "records_count": len(values),
+        "value": values,
     }
 
-    try: 
+    try:
         s3.put_object(
-            Bucket =  BUCKET,
-            Key = key,
-            Body = json.dumps(snapshot),
-            ContentType = "application/json"
+            Bucket=BUCKET,
+            Key=key,
+            Body=json.dumps(snapshot),
+            ContentType="application/json",
         )
         print(f"Uploaded {key}")
     except Exception as e:
