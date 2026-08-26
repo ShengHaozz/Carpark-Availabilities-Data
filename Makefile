@@ -9,7 +9,7 @@ APP_BUILDER_PROFILE ?= app-builder
 AWS_REGION ?= ap-southeast-1
 REPO_URL   ?= $(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO_NAME)
 WORKSPACE  := $(shell pwd)
-FUNCS      := silver_cold # func1 func2
+FUNCS      := silver_cold gold
 
 .PHONY: terraform_init profile bootstrap login build push digests apply deploy
 
