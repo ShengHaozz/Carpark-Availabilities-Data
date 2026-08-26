@@ -37,11 +37,9 @@ def test_run_dbt_commands_success(tmp_path: Path):
         results = run_dbt_commands(tmp_path)
 
         assert results == {
-            "snapshot": "SUCCESS",
-            "run": "SUCCESS",
-            "test": "SUCCESS",
+            "build": "SUCCESS",
         }
-        assert mock_runner.invoke.call_count == 3
+        assert mock_runner.invoke.call_count == 1
 
 
 def test_run_dbt_commands_failure(tmp_path: Path):
@@ -52,7 +50,7 @@ def test_run_dbt_commands_failure(tmp_path: Path):
     mock_runner.invoke.return_value = failed_result
 
     with patch("packages.gold.src.gold.handler.dbtRunner", return_value=mock_runner):
-        with pytest.raises(RuntimeError, match="dbt stage 'snapshot' failed"):
+        with pytest.raises(RuntimeError, match="dbt stage 'build' failed"):
             run_dbt_commands(tmp_path)
 
 
@@ -68,15 +66,13 @@ def test_handler_dev_mode(tmp_path: Path, monkeypatch):
         patch("packages.gold.src.gold.handler.run_dbt_commands") as mock_run,
     ):
         mock_run.return_value = {
-            "snapshot": "SUCCESS",
-            "run": "SUCCESS",
-            "test": "SUCCESS",
+            "build": "SUCCESS",
         }
 
         response = handler({}, None)
 
         assert response["status"] == "SUCCESS"
-        assert response["stages"]["run"] == "SUCCESS"
+        assert response["stages"]["build"] == "SUCCESS"
         mock_setup.assert_called_once_with(tmp_path)
         mock_run.assert_called_once_with(tmp_path)
 
@@ -93,9 +89,7 @@ def test_handler_prod_mode(tmp_path: Path, monkeypatch):
         patch("packages.gold.src.gold.handler.run_dbt_commands") as mock_run,
     ):
         mock_run.return_value = {
-            "snapshot": "SUCCESS",
-            "run": "SUCCESS",
-            "test": "SUCCESS",
+            "build": "SUCCESS",
         }
 
         response = handler({}, None)

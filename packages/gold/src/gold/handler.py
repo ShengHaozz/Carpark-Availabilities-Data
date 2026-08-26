@@ -59,35 +59,15 @@ def setup_dbt_environment(project_src_dir: Path, temp_dir: Path = DBT_TEMP_DIR) 
 
 
 def run_dbt_commands(project_dir: Path) -> Dict[str, Any]:
-    """Executes dbt snapshot, run, and test sequentially."""
+    """Executes dbt build across the project in topological DAG dependency order."""
     os.environ["DO_NOT_TRACK"] = "1"
     dbt = dbtRunner()
 
     stages = [
         (
-            "snapshot",
+            "build",
             [
-                "snapshot",
-                "--project-dir",
-                str(project_dir),
-                "--profiles-dir",
-                str(project_dir),
-            ],
-        ),
-        (
-            "run",
-            [
-                "run",
-                "--project-dir",
-                str(project_dir),
-                "--profiles-dir",
-                str(project_dir),
-            ],
-        ),
-        (
-            "test",
-            [
-                "test",
+                "build",
                 "--project-dir",
                 str(project_dir),
                 "--profiles-dir",
