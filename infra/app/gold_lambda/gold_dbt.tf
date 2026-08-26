@@ -115,22 +115,11 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "GlueCatalogDiscovery"
+        Sid    = "GlueCatalogAndDatabaseRead"
         Effect = "Allow"
         Action = [
           "glue:GetDatabases",
-          "glue:GetDatabase"
-        ]
-        Resource = [
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/silver",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/gold"
-        ]
-      },
-      {
-        Sid    = "GlueSilverReadAccess"
-        Effect = "Allow"
-        Action = [
+          "glue:GetDatabase",
           "glue:GetTable",
           "glue:GetTables",
           "glue:GetPartition",
@@ -138,24 +127,28 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
           "glue:BatchGetPartition"
         ]
         Resource = [
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/silver/*"
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/silver",
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/gold",
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/silver/*",
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/gold/*"
         ]
       },
       {
         Sid    = "GlueGoldTableManagement"
         Effect = "Allow"
         Action = [
-          "glue:GetTable",
-          "glue:GetTables",
           "glue:CreateTable",
           "glue:UpdateTable",
           "glue:DeleteTable",
-          "glue:GetPartition",
-          "glue:GetPartitions",
+          "glue:BatchDeleteTable",
           "glue:BatchCreatePartition",
-          "glue:BatchDeletePartition"
+          "glue:BatchDeletePartition",
+          "glue:BatchUpdatePartition"
         ]
         Resource = [
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/gold",
           "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/gold/*"
         ]
       }
