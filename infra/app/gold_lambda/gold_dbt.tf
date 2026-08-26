@@ -125,6 +125,8 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
           "glue:GetDatabase",
           "glue:GetTable",
           "glue:GetTables",
+          "glue:GetTableVersion",
+          "glue:GetTableVersions",
           "glue:GetPartition",
           "glue:GetPartitions",
           "glue:BatchGetPartition"
@@ -147,6 +149,8 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
           "glue:UpdateTable",
           "glue:DeleteTable",
           "glue:BatchDeleteTable",
+          "glue:DeleteTableVersion",
+          "glue:BatchDeleteTableVersion",
           "glue:BatchCreatePartition",
           "glue:BatchDeletePartition",
           "glue:BatchUpdatePartition"
