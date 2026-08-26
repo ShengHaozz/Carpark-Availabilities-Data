@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "ShengHaozz", email = "shenghaoong@gmail.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "dbt-athena-community>=1.11.0",
     "dbt-core>=1.12.2",

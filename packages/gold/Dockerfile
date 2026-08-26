@@ -1,12 +1,10 @@
 # -- build package --
-FROM public.ecr.aws/lambda/python:3.14 AS build
-
-# Install build tools needed for C-extensions (e.g. mmh3)
-RUN dnf install -y gcc && dnf clean all
+FROM public.ecr.aws/lambda/python:3.12 AS build
 
 RUN pip install --no-cache-dir uv
 
 WORKDIR /build
+
 
 COPY pyproject.toml uv.lock ./
 COPY packages/gold/ packages/gold/
@@ -25,7 +23,8 @@ COPY packages/gold/macros /asset/macros
 COPY packages/gold/analyses /asset/analyses
 
 # -- copy to lambda runtime --
-FROM public.ecr.aws/lambda/python:3.14
+FROM public.ecr.aws/lambda/python:3.12
+
 
 COPY --from=build /asset ${LAMBDA_TASK_ROOT}
 

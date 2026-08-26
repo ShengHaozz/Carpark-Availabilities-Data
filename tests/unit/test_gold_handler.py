@@ -103,3 +103,35 @@ def test_handler_prod_mode(tmp_path: Path, monkeypatch):
         assert response["status"] == "SUCCESS"
         mock_setup.assert_called_once_with(tmp_path)
         mock_run.assert_called_once_with(tmp_path)
+
+
+def test_multiprocessing_lambda_patch():
+    """Verify that multiprocessing primitives are patched to use threading primitives for AWS Lambda."""
+    import multiprocessing
+    import multiprocessing.synchronize
+    import threading
+    from dbt.mp_context import get_mp_context
+
+    # Ensure synchronization primitives return threading objects
+    rlock = multiprocessing.synchronize.RLock()
+    lock = multiprocessing.synchronize.Lock()
+    sem = multiprocessing.synchronize.Semaphore()
+    bounded_sem = multiprocessing.synchronize.BoundedSemaphore()
+    cond = multiprocessing.synchronize.Condition()
+    event = multiprocessing.synchronize.Event()
+
+    assert isinstance(rlock, type(threading.RLock()))
+    assert isinstance(lock, type(threading.Lock()))
+    assert isinstance(sem, threading.Semaphore)
+    assert isinstance(bounded_sem, threading.BoundedSemaphore)
+    assert isinstance(cond, threading.Condition)
+    assert isinstance(event, threading.Event)
+
+    # Verify dbt's mp_context retrieves non-failing threading locks
+    mp_ctx = get_mp_context()
+    ctx_rlock = mp_ctx.RLock()
+    assert isinstance(ctx_rlock, type(threading.RLock()))
+
+    # Verify lock behavior
+    with ctx_rlock:
+        assert True

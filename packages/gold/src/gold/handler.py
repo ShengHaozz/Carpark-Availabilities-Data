@@ -1,9 +1,27 @@
 import logging
+import multiprocessing
+import multiprocessing.synchronize
 import os
 from pathlib import Path
 import shutil
+import threading
 from typing import Any, Dict
-from dbt.cli.main import dbtRunner, dbtRunnerResult
+
+# Monkey-patch multiprocessing primitives to support AWS Lambda's stripped environment (no /dev/shm)
+multiprocessing.synchronize.RLock = lambda *args, **kwargs: threading.RLock()
+multiprocessing.synchronize.Lock = lambda *args, **kwargs: threading.Lock()
+multiprocessing.synchronize.Semaphore = lambda value=1, *args, **kwargs: (
+    threading.Semaphore(value)
+)
+multiprocessing.synchronize.BoundedSemaphore = lambda value=1, *args, **kwargs: (
+    threading.BoundedSemaphore(value)
+)
+multiprocessing.synchronize.Condition = lambda lock=None, *args, **kwargs: (
+    threading.Condition(lock)
+)
+multiprocessing.synchronize.Event = lambda *args, **kwargs: threading.Event()
+
+from dbt.cli.main import dbtRunner, dbtRunnerResult  # noqa: E402
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
