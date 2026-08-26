@@ -87,7 +87,7 @@ resource "aws_iam_role_policy" "gold_dbt_athena_policy" {
           "athena:GetWorkGroup"
         ]
         Resource = [
-          "arn:aws:athena:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:workgroup/primary"
+          "arn:aws:athena:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workgroup/primary"
         ]
       },
       {
@@ -122,9 +122,9 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
           "glue:GetDatabase"
         ]
         Resource = [
-          "arn:aws:glue:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:catalog",
-          "arn:aws:glue:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:database/silver",
-          "arn:aws:glue:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:database/gold"
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/silver",
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/gold"
         ]
       },
       {
@@ -138,7 +138,7 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
           "glue:BatchGetPartition"
         ]
         Resource = [
-          "arn:aws:glue:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/silver/*"
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/silver/*"
         ]
       },
       {
@@ -156,7 +156,7 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
           "glue:BatchDeletePartition"
         ]
         Resource = [
-          "arn:aws:glue:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:table/gold/*"
+          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/gold/*"
         ]
       }
     ]
