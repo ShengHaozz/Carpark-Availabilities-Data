@@ -15,19 +15,11 @@ Gap: A system that captures historical availability patterns and surfaces them i
 5. Are there carparks that are systematically full at certain times that drivers should avoid entirely?
 
 
-## Silver - Schema
-PKey: (carpark_id, ingestion_timestamp)
-| Column | Type | Nullable | Source | Notes |
-| --- | --- | --- | --- | --- |
-| carpark_id | string | No | lta | Native ID from LTA datamall |
-| snapshot_timestamp | utc timestamp | No | both | timestamp from bronze json |
-| lot_type | string | No | lta | 'C', 'H', 'Y' or 'unknown' |
-| lots_available | int | No | lta | >= 0 |
-| total_lots | int | Yes | hdb | null for LTA, derived in Gold |
-| location_lat | float | Yes | lta | from location |
-| location_long | float | Yes | lta | from location |
-| area | string | Yes | lta | |
-| development | string | Yes | lta | |
-| agency | string | No | lta | 'LTA' / 'URA' / 'HDB' |
-| ingestion_timestamp | utc timestamp | No | derived | when this row was written | 
-| source_filepath | string | No | derived | S3 path for lineage |
+## Documentation
+
+Comprehensive developer and architecture guides are available in the [`docs/`](docs/) directory:
+
+- **[Architecture & Developer Overview](docs/overview.md)**: Monorepo layout, prerequisites, `.env` config, deployment lifecycle, and local development.
+- **[Bronze Layer Guide](docs/bronze.md)**: Raw API pollers (LTA & HDB), pagination, rate limiting, and S3 JSON storage.
+- **[Silver Layer Guide](docs/silver.md)**: Daily batch transformation, Pydantic data modeling, Parquet generation with ZSTD, and AWS Glue partition projection.
+- **[Gold Layer Guide](docs/gold.md)**: dbt-athena models, SCD Type 2 dimension tracking (`snp_carpark` / `dim_carpark`), partitioned fact tables (`fct_lot_availability`), and data quality tests.
