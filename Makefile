@@ -11,7 +11,7 @@ REPO_URL   ?= $(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO_NAME)
 WORKSPACE  := $(shell pwd)
 FUNCS      := silver_cold gold
 
-.PHONY: terraform_init profile bootstrap login build push digests apply deploy
+.PHONY: terraform_init profile bootstrap ecr_up ecr_down notif_up notif_down login build push digests apply deploy
 
 terraform_init:
 	terraform -chdir=infra/app init
@@ -63,6 +63,18 @@ ecr_up:
 ecr_down:
 	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
 	terraform -chdir=infra/ecr destroy --auto-approve
+
+notif_up:
+	@terraform -chdir=infra/notifications apply \
+	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
+	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
+	-auto-approve
+
+notif_down:
+	@terraform -chdir=infra/notifications destroy \
+	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
+	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
+	-auto-approve
 
 login:
 	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
@@ -135,25 +147,5 @@ dbt_run:
 dbt_test:
 	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
 	uv run --package gold dbt test --project-dir packages/gold --profiles-dir packages/gold
-
-notifications_init:
-	@terraform -chdir=infra/notifications init
-
-notifications_plan:
-	@terraform -chdir=infra/notifications plan \
-	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
-	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)"
-
-notifications_apply:
-	@terraform -chdir=infra/notifications apply \
-	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
-	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
-	-auto-approve
-
-notifications_destroy:
-	@terraform -chdir=infra/notifications destroy \
-	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
-	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
-	-auto-approve
 
 
