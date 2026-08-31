@@ -10,7 +10,11 @@
 with staging_snapshots as (
     select * from {{ ref('stg_silver__carpark_snapshots') }}
     {% if is_incremental() %}
-    where snapshot_timestamp > (select coalesce(max(snapshot_timestamp), timestamp '1970-01-01 00:00:00') from {{ this }})
+    -- 7-day lookback window to support automatic backfills, late-arriving data, and reruns
+    where snapshot_timestamp >= (
+        select coalesce(date_add('day', -7, max(snapshot_timestamp)), timestamp '1970-01-01 00:00:00') 
+        from {{ this }}
+    )
     {% endif %}
 ),
 
