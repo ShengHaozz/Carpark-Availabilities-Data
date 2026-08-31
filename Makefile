@@ -17,6 +17,7 @@ terraform_init:
 	terraform -chdir=infra/app init
 	terraform -chdir=infra/bootstrap init
 	terraform -chdir=infra/ecr init
+	terraform -chdir=infra/notifications init
 
 profile: terraform_init
 	@test -n "$(TF_VAR_ACCESS_KEY)" || (echo "TF_VAR_ACCESS_KEY is not set" && exit 1)
@@ -134,4 +135,25 @@ dbt_run:
 dbt_test:
 	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
 	uv run --package gold dbt test --project-dir packages/gold --profiles-dir packages/gold
+
+notifications_init:
+	@terraform -chdir=infra/notifications init
+
+notifications_plan:
+	@terraform -chdir=infra/notifications plan \
+	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
+	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)"
+
+notifications_apply:
+	@terraform -chdir=infra/notifications apply \
+	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
+	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
+	-auto-approve
+
+notifications_destroy:
+	@terraform -chdir=infra/notifications destroy \
+	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
+	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
+	-auto-approve
+
 
