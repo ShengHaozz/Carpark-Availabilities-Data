@@ -272,4 +272,8 @@ tmp/*
 target/
 dbt_packages/
 logs/
-.user.yml
+.user.yml
+
+# Git worktrees
+.worktree/
+.worktrees/
