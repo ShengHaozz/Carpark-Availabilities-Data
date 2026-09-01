@@ -1,15 +1,56 @@
-data "aws_caller_identity" "current" {}
+# --- Default Event Bus Logging ---
+
+resource "aws_cloudwatch_log_group" "default_bus_log" {
+  name              = "/aws/events/default-log"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_resource_policy" "default_bus_log" {
+  policy_name = "eventbridge-default-bus-log-policy"
+
+  policy_document = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "events.amazonaws.com"
+      }
+      Action = [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+      ]
+      Resource = "${aws_cloudwatch_log_group.default_bus_log.arn}:*"
+    }]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "default_bus_log" {
+  name = "eventbridge-default-log"
+
+  event_pattern = jsonencode({
+    source = [{
+      prefix = ""
+    }]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "default_bus_log" {
+  rule = aws_cloudwatch_event_rule.default_bus_log.name
+
+  target_id = "log-all-events"
+  arn       = aws_cloudwatch_log_group.default_bus_log.arn
+}
 
 # Package Python Lambda Handler
 data "archive_file" "notifier_zip" {
   type        = "zip"
-  source_dir  = "${path.module}/../../packages/notifier/src/notifier"
+  source_dir  = "${path.module}/../../packages/notifier/src"
   output_path = "${path.module}/lambda/notifier.zip"
 }
 
 # IAM Role for Telegram Notifier Lambda
 resource "aws_iam_role" "notifier_lambda_role" {
-  name = "step_functions_telegram_notifier_role"
+  name = "telegram_notifier_role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -25,7 +66,7 @@ resource "aws_iam_role" "notifier_lambda_role" {
 
 # IAM Policy to inspect Step Functions executions
 resource "aws_iam_role_policy" "sfn_read_policy" {
-  name = "step_functions_describe_execution"
+  name = "telegram_notifier_step_functions_read"
   role = aws_iam_role.notifier_lambda_role.name
 
   policy = jsonencode({
@@ -52,10 +93,10 @@ resource "aws_iam_role_policy_attachment" "notifier_lambda_logs" {
 
 # Lambda Function
 resource "aws_lambda_function" "telegram_notifier" {
-  function_name = "step_functions_telegram_notifier"
+  function_name = "telegram_notifier"
   role          = aws_iam_role.notifier_lambda_role.arn
   runtime       = "python3.13"
-  handler       = "handler.handler"
+  handler       = "notifier.handler"
 
   filename         = data.archive_file.notifier_zip.output_path
   source_code_hash = data.archive_file.notifier_zip.output_base64sha256
@@ -97,7 +138,7 @@ resource "aws_cloudwatch_event_rule" "step_functions_failure_rule" {
 # EventBridge Target
 resource "aws_cloudwatch_event_target" "notifier_target" {
   rule      = aws_cloudwatch_event_rule.step_functions_failure_rule.name
-  target_id = "step-functions-telegram-notifier"
+  target_id = "telegram-notifier"
   arn       = aws_lambda_function.telegram_notifier.arn
 }
 
@@ -124,7 +165,7 @@ resource "aws_cloudwatch_event_rule" "bronze_lambda_result_rule" {
 
 resource "aws_cloudwatch_event_target" "bronze_lambda_notifier_target" {
   rule      = aws_cloudwatch_event_rule.bronze_lambda_result_rule.name
-  target_id = "bronze-lambda-telegram-notifier"
+  target_id = "telegram-notifier"
   arn       = aws_lambda_function.telegram_notifier.arn
 }
 
