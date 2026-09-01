@@ -15,8 +15,13 @@ variable "telegram_chat_id" {
   type        = string
 }
 
-variable "state_machine_filter_prefix" {
-  description = "Prefix of Step Functions state machines to monitor (e.g. 'carpark-'). Leave empty to monitor all."
-  type        = string
-  default     = "carpark-"
+variable "state_machine_arns" {
+  description = "List of Step Functions state machine ARNs to monitor"
+  type        = list(string)
+}
+
+variable "state_machine_statuses" {
+  description = "List of Step Functions execution statuses to monitor"
+  type        = list(string)
+  default     = ["SUCCEEDED", "FAILED", "TIMED_OUT", "ABORTED"]
 }

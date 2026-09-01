@@ -64,18 +64,6 @@ ecr_down:
 	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
 	terraform -chdir=infra/ecr destroy --auto-approve
 
-notif_up:
-	@terraform -chdir=infra/notifications apply \
-	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
-	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
-	-auto-approve
-
-notif_down:
-	@terraform -chdir=infra/notifications destroy \
-	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
-	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
-	-auto-approve
-
 login:
 	AWS_PROFILE=$(ECR_BUILDER_PROFILE) \
 	aws ecr get-login-password --region $(AWS_REGION) \
@@ -127,6 +115,20 @@ apply: digests
 
 deploy: apply
 	@echo "Deployed: $(FUNCS)"
+
+notif_up:
+	@SFN_ARN=$$(terraform -chdir=infra/app output -raw step_function_arn); \
+	terraform -chdir=infra/notifications apply \
+		-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
+		-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
+		-var="state_machine_arns=[\"$$SFN_ARN\"]" \
+		-auto-approve
+
+notif_down:
+	@terraform -chdir=infra/notifications destroy \
+	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
+	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
+	-auto-approve
 
 dbt_parse:
 	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \

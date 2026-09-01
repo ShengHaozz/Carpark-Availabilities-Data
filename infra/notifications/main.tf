@@ -3,7 +3,7 @@ data "aws_caller_identity" "current" {}
 # Package Python Lambda Handler
 data "archive_file" "notifier_zip" {
   type        = "zip"
-  source_file = "${path.module}/../../packages/notifier/src/notifier/handler.py"
+  source_dir  = "${path.module}/../../packages/notifier/src/notifier"
   output_path = "${path.module}/lambda/notifier.zip"
 }
 
@@ -37,7 +37,8 @@ resource "aws_iam_role_policy" "sfn_read_policy" {
         "states:GetExecutionHistory"
       ]
       Resource = [
-        "arn:aws:states:${var.aws_region}:${data.aws_caller_identity.current.account_id}:execution:*:*"
+        for arn in var.state_machine_arns :
+        "${replace(arn, ":stateMachine:", ":execution:")}:*"
       ]
     }]
   })
@@ -58,9 +59,8 @@ resource "aws_lambda_function" "telegram_notifier" {
 
   filename         = data.archive_file.notifier_zip.output_path
   source_code_hash = data.archive_file.notifier_zip.output_base64sha256
-
-  timeout     = 30
-  memory_size = 128
+  timeout          = 30
+  memory_size      = 128
 
   environment {
     variables = {
@@ -71,25 +71,26 @@ resource "aws_lambda_function" "telegram_notifier" {
   }
 }
 
+# EventBridge Lambda Permission
+resource "aws_lambda_permission" "allow_eventbridge_invoke" {
+  statement_id  = "AllowEventBridgeInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.telegram_notifier.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.step_functions_failure_rule.arn
+}
+
 # EventBridge Rule on Default Bus to capture Step Function status changes
 resource "aws_cloudwatch_event_rule" "step_functions_failure_rule" {
   name        = "step-functions-telegram-alerts"
-  description = "Captures Step Functions FAILED, TIMED_OUT, and ABORTED executions"
+  description = "Captures Step Functions execution status changes"
 
-  event_pattern = var.state_machine_filter_prefix != "" ? jsonencode({
+  event_pattern = jsonencode({
     source      = ["aws.states"]
     detail-type = ["Step Functions Execution Status Change"]
     detail = {
-      status = ["FAILED", "TIMED_OUT", "ABORTED"]
-      stateMachineArn = [{
-        prefix = "arn:aws:states:${var.aws_region}:${data.aws_caller_identity.current.account_id}:stateMachine:${var.state_machine_filter_prefix}"
-      }]
-    }
-    }) : jsonencode({
-    source      = ["aws.states"]
-    detail-type = ["Step Functions Execution Status Change"]
-    detail = {
-      status = ["FAILED", "TIMED_OUT", "ABORTED"]
+      status          = var.state_machine_statuses
+      stateMachineArn = var.state_machine_arns
     }
   })
 }
@@ -99,13 +100,4 @@ resource "aws_cloudwatch_event_target" "notifier_target" {
   rule      = aws_cloudwatch_event_rule.step_functions_failure_rule.name
   target_id = "step-functions-telegram-notifier"
   arn       = aws_lambda_function.telegram_notifier.arn
-}
-
-# Lambda Permission for EventBridge
-resource "aws_lambda_permission" "allow_eventbridge_invoke" {
-  statement_id  = "AllowEventBridgeInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.telegram_notifier.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.step_functions_failure_rule.arn
 }

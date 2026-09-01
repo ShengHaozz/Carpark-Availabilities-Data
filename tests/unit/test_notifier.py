@@ -4,14 +4,26 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
-from packages.notifier.src.notifier.handler import (
+from packages.notifier.src.notifier.formatters.cloudwatch_alarm import (
+    format_cloudwatch_alarm_event,
+)
+from packages.notifier.src.notifier.formatters.generic import format_generic_event
+from packages.notifier.src.notifier.formatters.registry import (
+    get_formatter,
+    register_formatter,
+)
+from packages.notifier.src.notifier.formatters.step_functions import (
     build_console_url,
-    build_telegram_message,
     extract_failure_details_from_history,
     format_duration,
+    format_step_functions_event,
     format_timestamp,
-    handler,
+)
+from packages.notifier.src.notifier.handler import handler
+from packages.notifier.src.notifier.telegram import (
+    escape_html,
     send_telegram_message,
+    truncate_text,
 )
 
 
@@ -52,6 +64,9 @@ def test_handler_missing_env_vars(monkeypatch):
 
     with pytest.raises(ValueError, match="Missing required environment variables"):
         handler({"detail": {}})
+
+
+# --- Step Functions Formatter Tests ---
 
 
 def test_extract_failure_details_from_history():
@@ -116,39 +131,141 @@ def test_build_console_url():
     assert "arn:aws:states:ap-southeast-1:123:execution:sm:e1" in url
 
 
-def test_build_telegram_message_html_escaping():
-    msg = build_telegram_message(
-        state_machine_name="carpark<test>&pipeline",
-        status="FAILED",
-        execution_name="exec<1>",
-        execution_arn="arn:aws:states:exec",
-        region="ap-southeast-1",
-        duration_str="2m",
-        timestamp_str="2026-08-31 01:00:00 UTC",
-        failed_state="Transform<Silver>",
-        error_code="Error&Fail",
-        error_cause="<script>alert('xss')</script>",
-    )
-    assert "&lt;test&gt;" in msg
-    assert "&amp;pipeline" in msg
+@patch("packages.notifier.src.notifier.formatters.step_functions.get_stepfunctions_client")
+def test_format_step_functions_event(mock_get_sfn, sample_sfn_failed_event):
+    mock_sfn = MagicMock()
+    mock_sfn.get_execution_history.return_value = {
+        "events": [
+            {
+                "type": "TaskStateEntered",
+                "stateEnteredEventDetails": {"name": "Transform<Silver>"},
+            },
+            {
+                "type": "TaskFailed",
+                "taskFailedEventDetails": {
+                    "error": "Error&Fail",
+                    "cause": "<script>alert('xss')</script>",
+                },
+            },
+        ]
+    }
+    mock_get_sfn.return_value = mock_sfn
+
+    msg = format_step_functions_event(sample_sfn_failed_event, "ap-southeast-1")
+    assert "carpark-daily-pipeline" in msg
+    assert "Step Functions Pipeline Failed" in msg
+    assert "Transform&lt;Silver&gt;" in msg
     assert "&lt;script&gt;" in msg
     assert "<script>" not in msg
+    assert "Open in AWS Console" in msg
 
 
-def test_build_telegram_message_truncation():
-    very_long_cause = "E" * 5000
-    msg = build_telegram_message(
-        state_machine_name="carpark-pipeline",
-        status="FAILED",
-        execution_name="exec-1",
-        execution_arn="arn:aws:states:exec",
-        region="ap-southeast-1",
-        duration_str="1m",
-        timestamp_str="2026-08-31",
-        error_cause=very_long_cause,
-    )
-    assert len(msg) <= 4000
-    assert "[truncated]" in msg
+def test_format_step_functions_event_succeeded():
+    event = {
+        "source": "aws.states",
+        "detail": {
+            "executionArn": "arn:aws:states:ap-southeast-1:123:execution:carpark-daily-pipeline:exec-456",
+            "stateMachineArn": "arn:aws:states:ap-southeast-1:123:stateMachine:carpark-daily-pipeline",
+            "name": "exec-456",
+            "status": "SUCCEEDED",
+            "startDate": 1756598400000,
+            "stopDate": 1756598500000,
+            "output": json.dumps({"status": "SUCCESS", "rows_processed": 1000}),
+        },
+    }
+
+    msg = format_step_functions_event(event, "ap-southeast-1")
+    assert "Step Functions Pipeline Succeeded" in msg
+    assert "carpark-daily-pipeline" in msg
+    assert "1m 40s" in msg
+    assert "rows_processed" in msg
+    assert "Open in AWS Console" in msg
+
+
+def test_format_step_functions_event_running():
+    event = {
+        "source": "aws.states",
+        "detail": {
+            "executionArn": "arn:aws:states:ap-southeast-1:123:execution:carpark-daily-pipeline:exec-789",
+            "stateMachineArn": "arn:aws:states:ap-southeast-1:123:stateMachine:carpark-daily-pipeline",
+            "name": "exec-789",
+            "status": "RUNNING",
+            "startDate": 1756598400000,
+        },
+    }
+
+    msg = format_step_functions_event(event, "ap-southeast-1")
+    assert "Step Functions Pipeline Started" in msg
+    assert "carpark-daily-pipeline" in msg
+
+
+# --- CloudWatch Alarm Formatter Tests ---
+
+
+def test_format_cloudwatch_alarm_event():
+    alarm_event = {
+        "source": "aws.cloudwatch",
+        "detail-type": "CloudWatch Alarm State Change",
+        "time": "2026-08-31T02:00:00Z",
+        "detail": {
+            "alarmName": "HighLambdaErrorRate",
+            "state": {
+                "value": "ALARM",
+                "reason": "Threshold Crossed: 1 out of 1 datapoints was greater than 5.",
+            },
+            "previousStateValue": "OK",
+        },
+    }
+
+    msg = format_cloudwatch_alarm_event(alarm_event, "ap-southeast-1")
+    assert "CloudWatch Alarm Alert" in msg
+    assert "HighLambdaErrorRate" in msg
+    assert "ALARM" in msg
+    assert "Threshold Crossed" in msg
+
+
+# --- Generic Fallback Formatter Tests ---
+
+
+def test_format_generic_event():
+    event = {
+        "source": "aws.s3",
+        "detail-type": "Object Created",
+        "detail": {"bucket": "my-bucket", "key": "test.json"},
+    }
+
+    msg = format_generic_event(event, "ap-southeast-1")
+    assert "System Notification" in msg
+    assert "aws.s3" in msg
+    assert "my-bucket" in msg
+
+
+# --- Formatter Registry Tests ---
+
+
+def test_registry_resolution():
+    assert get_formatter({"source": "aws.states"}) == format_step_functions_event
+    assert get_formatter({"source": "aws.cloudwatch"}) == format_cloudwatch_alarm_event
+    assert get_formatter({"source": "aws.alarm"}) == format_cloudwatch_alarm_event
+    assert get_formatter({"source": "unknown.service"}) == format_generic_event
+
+
+def test_register_custom_formatter():
+    def custom_glue_formatter(event, region):
+        return "Glue Custom Alert"
+
+    register_formatter("aws.glue", custom_glue_formatter)
+    assert get_formatter({"source": "aws.glue"})({"source": "aws.glue"}, "ap-southeast-1") == "Glue Custom Alert"
+
+
+# --- Telegram Dispatcher & Truncation Tests ---
+
+
+def test_escape_html_and_truncate():
+    assert escape_html("<b>hello</b>") == "&lt;b&gt;hello&lt;/b&gt;"
+    assert escape_html(None) == ""
+    assert truncate_text("A" * 2000, max_len=10) == "AAAAAAAAAA... [truncated]"
+    assert truncate_text(None) == ""
 
 
 @patch("urllib.request.urlopen")
@@ -177,30 +294,36 @@ def test_send_telegram_message_http_error(mock_urlopen):
         send_telegram_message("test_token", "invalid_chat", "Hello")
 
 
-@patch("packages.notifier.src.notifier.handler.get_stepfunctions_client")
+# --- End-to-End Handler Tests ---
+
+
+@patch("packages.notifier.src.notifier.formatters.step_functions.get_stepfunctions_client")
 @patch("packages.notifier.src.notifier.handler.send_telegram_message")
-def test_handler_end_to_end(mock_send, mock_get_sfn, mock_env, sample_sfn_failed_event):
+def test_handler_step_functions_event(mock_send, mock_get_sfn, mock_env, sample_sfn_failed_event):
     mock_sfn = MagicMock()
-    mock_sfn.get_execution_history.return_value = {
-        "events": [
-            {
-                "type": "TaskStateEntered",
-                "stateEnteredEventDetails": {"name": "RunGoldDbt"},
-            },
-            {
-                "type": "TaskFailed",
-                "taskFailedEventDetails": {
-                    "error": "DbtBuildError",
-                    "cause": "Model fct_lot_availability failed",
-                },
-            },
-        ]
-    }
+    mock_sfn.get_execution_history.return_value = {"events": []}
     mock_get_sfn.return_value = mock_sfn
     mock_send.return_value = {"statusCode": 200, "response": {"ok": True}}
 
     result = handler(sample_sfn_failed_event)
     assert result["status"] == "SUCCESS"
-    assert result["state_machine"] == "carpark-daily-pipeline"
+    assert result["source"] == "aws.states"
     assert result["statusCode"] == 200
+    assert mock_send.called
+
+
+@patch("packages.notifier.src.notifier.handler.send_telegram_message")
+def test_handler_fallback_event(mock_send, mock_env):
+    mock_send.return_value = {"statusCode": 200, "response": {"ok": True}}
+
+    event = {
+        "source": "aws.s3",
+        "detail": {
+            "bucket": "test-bucket",
+        },
+    }
+
+    result = handler(event)
+    assert result["status"] == "SUCCESS"
+    assert result["source"] == "aws.s3"
     assert mock_send.called
