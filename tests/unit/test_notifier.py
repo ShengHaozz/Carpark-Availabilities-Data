@@ -8,6 +8,9 @@ from packages.notifier.src.notifier.formatters.cloudwatch_alarm import (
     format_cloudwatch_alarm_event,
 )
 from packages.notifier.src.notifier.formatters.generic import format_generic_event
+from packages.notifier.src.notifier.formatters.lambda_invocation import (
+    format_lambda_invocation_event,
+)
 from packages.notifier.src.notifier.formatters.registry import (
     get_formatter,
     register_formatter,
@@ -240,6 +243,57 @@ def test_format_generic_event():
     assert "my-bucket" in msg
 
 
+# --- Lambda Invocation Formatter Tests ---
+
+
+def test_format_lambda_invocation_success_event():
+    event = {
+        "source": "lambda",
+        "detail-type": "Lambda Function Invocation Result - Success",
+        "time": "2026-09-01T17:30:13Z",
+        "detail": {
+            "requestContext": {
+                "requestId": "request-123",
+                "functionArn": "arn:aws:lambda:ap-southeast-1:123:function:datamall_ingestion_lambda:$LATEST",
+                "condition": "Success",
+                "approximateInvokeCount": 1,
+            },
+            "responseContext": {"statusCode": 200, "executedVersion": "$LATEST"},
+        },
+    }
+
+    msg = format_lambda_invocation_event(event, "ap-southeast-1")
+
+    assert "Lambda Invocation Succeeded" in msg
+    assert "datamall_ingestion_lambda" in msg
+    assert "Success" in msg
+    assert "200" in msg
+    assert "Open in AWS Console" in msg
+
+
+def test_format_lambda_invocation_failure_event_escapes_error_payload():
+    event = {
+        "source": "lambda",
+        "detail-type": "Lambda Function Invocation Result - Failure",
+        "detail": {
+            "requestContext": {
+                "functionArn": "arn:aws:lambda:ap-southeast-1:123:function:hdb_data_ingestion:$LATEST",
+                "condition": "RetriesExhausted",
+                "approximateInvokeCount": 3,
+            },
+            "responsePayload": {"errorMessage": "<connection failed>"},
+        },
+    }
+
+    msg = format_lambda_invocation_event(event, "ap-southeast-1")
+
+    assert "Lambda Invocation Failed" in msg
+    assert "RetriesExhausted" in msg
+    assert "Attempt:</b> 3" in msg
+    assert "&lt;connection failed&gt;" in msg
+    assert "<connection failed>" not in msg
+
+
 # --- Formatter Registry Tests ---
 
 
@@ -247,6 +301,7 @@ def test_registry_resolution():
     assert get_formatter({"source": "aws.states"}) == format_step_functions_event
     assert get_formatter({"source": "aws.cloudwatch"}) == format_cloudwatch_alarm_event
     assert get_formatter({"source": "aws.alarm"}) == format_cloudwatch_alarm_event
+    assert get_formatter({"source": "lambda"}) == format_lambda_invocation_event
     assert get_formatter({"source": "unknown.service"}) == format_generic_event
 
 

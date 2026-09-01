@@ -1,6 +1,7 @@
 from .base import EventFormatter
 from .cloudwatch_alarm import format_cloudwatch_alarm_event
 from .generic import format_generic_event
+from .lambda_invocation import format_lambda_invocation_event
 from .registry import (
     get_formatter,
     register_fallback_formatter,
@@ -16,4 +17,5 @@ __all__ = [
     "format_step_functions_event",
     "format_cloudwatch_alarm_event",
     "format_generic_event",
+    "format_lambda_invocation_event",
 ]
