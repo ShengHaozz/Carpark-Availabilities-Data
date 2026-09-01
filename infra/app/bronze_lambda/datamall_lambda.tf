@@ -45,6 +45,20 @@ resource "aws_iam_role_policy" "lta_lambda_s3_put_policy" {
   })
 }
 
+resource "aws_iam_role_policy" "lta_lambda_eventbridge_put_policy" {
+  name = "lambda-eventbridge-put"
+  role = aws_iam_role.lambda_role_datamall_ingestion.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["events:PutEvents"]
+      Resource = data.aws_cloudwatch_event_bus.default.arn
+    }]
+  })
+}
+
 # CloudWatch Logs Permission
 resource "aws_iam_role_policy_attachment" "lta_datamall_lambda_logs" {
   role       = aws_iam_role.lambda_role_datamall_ingestion.name
@@ -71,4 +85,20 @@ resource "aws_lambda_function" "datamall_ingestion_lambda" {
       SOURCE      = local.lta_source
     }
   }
+}
+
+resource "aws_lambda_function_event_invoke_config" "datamall_notifications" {
+  function_name = aws_lambda_function.datamall_ingestion_lambda.function_name
+
+  destination_config {
+    on_success {
+      destination = data.aws_cloudwatch_event_bus.default.arn
+    }
+
+    on_failure {
+      destination = data.aws_cloudwatch_event_bus.default.arn
+    }
+  }
+
+  depends_on = [aws_iam_role_policy.lta_lambda_eventbridge_put_policy]
 }

@@ -118,10 +118,12 @@ deploy: apply
 
 notif_up:
 	@SFN_ARN=$$(terraform -chdir=infra/app output -raw step_function_arn); \
+	BRONZE_LAMBDA_ARNS=$$(terraform -chdir=infra/app output -json bronze_lambda_arns); \
 	terraform -chdir=infra/notifications apply \
 		-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
 		-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
 		-var="state_machine_arns=[\"$$SFN_ARN\"]" \
+		-var="bronze_lambda_arns=$$BRONZE_LAMBDA_ARNS" \
 		-auto-approve
 
 notif_down:
@@ -150,4 +152,4 @@ dbt_test:
 	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
 	uv run --package gold dbt test --project-dir packages/gold --profiles-dir packages/gold
 
-
+

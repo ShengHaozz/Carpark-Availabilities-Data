@@ -100,3 +100,38 @@ resource "aws_cloudwatch_event_target" "notifier_target" {
   target_id = "step-functions-telegram-notifier"
   arn       = aws_lambda_function.telegram_notifier.arn
 }
+
+# EventBridge Rule on the default bus for Bronze Lambda invocation outcomes.
+resource "aws_cloudwatch_event_rule" "bronze_lambda_result_rule" {
+  name        = "bronze-lambda-telegram-alerts"
+  description = "Captures Bronze Lambda asynchronous invocation results"
+
+  event_pattern = jsonencode({
+    source = ["lambda"]
+    detail-type = [
+      "Lambda Function Invocation Result - Success",
+      "Lambda Function Invocation Result - Failure",
+    ]
+    detail = {
+      requestContext = {
+        functionArn = [
+          for arn in var.bronze_lambda_arns : { prefix = arn }
+        ]
+      }
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "bronze_lambda_notifier_target" {
+  rule      = aws_cloudwatch_event_rule.bronze_lambda_result_rule.name
+  target_id = "bronze-lambda-telegram-notifier"
+  arn       = aws_lambda_function.telegram_notifier.arn
+}
+
+resource "aws_lambda_permission" "allow_bronze_eventbridge_invoke" {
+  statement_id  = "AllowBronzeEventBridgeInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.telegram_notifier.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.bronze_lambda_result_rule.arn
+}

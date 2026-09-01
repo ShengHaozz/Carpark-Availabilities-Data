@@ -25,3 +25,8 @@ variable "state_machine_statuses" {
   type        = list(string)
   default     = ["SUCCEEDED", "FAILED", "TIMED_OUT", "ABORTED"]
 }
+
+variable "bronze_lambda_arns" {
+  description = "Bronze Lambda ARNs whose asynchronous invocation results should be sent to Telegram"
+  type        = list(string)
+}
