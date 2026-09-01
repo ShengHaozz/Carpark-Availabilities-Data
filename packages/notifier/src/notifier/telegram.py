@@ -30,12 +30,14 @@ def send_telegram_message(bot_token: str, chat_id: str, message: str) -> dict[st
         message = message[:TELEGRAM_MESSAGE_LIMIT] + "\n... [Message Truncated]"
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = json.dumps({
-        "chat_id": chat_id,
-        "text": message,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True,
-    }).encode("utf-8")
+    payload = json.dumps(
+        {
+            "chat_id": chat_id,
+            "text": message,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        }
+    ).encode("utf-8")
 
     req = urllib.request.Request(
         url,
@@ -45,7 +47,7 @@ def send_telegram_message(bot_token: str, chat_id: str, message: str) -> dict[st
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=30) as response:
             res_body = response.read().decode("utf-8")
             return {
                 "statusCode": response.status,
