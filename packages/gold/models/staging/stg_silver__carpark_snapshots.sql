@@ -10,7 +10,7 @@ typed_and_cleaned as (
             cast(snapshot_timestamp as varchar)
         )))) as snapshot_id,
         cast(carpark_id as varchar) as carpark_id,
-        cast(lot_type as varchar) as lot_type,
+        coalesce(cast(lot_type as varchar), 'unknown') as lot_type,
         cast(lots_available as integer) as lots_available,
         cast(total_lots as integer) as total_lots,
         cast(location_latitude as double) as location_latitude,
@@ -22,7 +22,7 @@ typed_and_cleaned as (
         cast(ingestion_timestamp as timestamp) as ingestion_timestamp,
         cast(source_filepath as varchar) as source_filepath,
         row_number() over (
-            partition by carpark_id, lot_type, snapshot_timestamp 
+            partition by carpark_id, coalesce(lot_type, 'unknown'), snapshot_timestamp 
             order by ingestion_timestamp desc
         ) as row_num
     from source_data
