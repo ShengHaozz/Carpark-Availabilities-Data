@@ -24,6 +24,7 @@ models:
           - accepted_values:
               arguments:
                 values: [1, 2, 3, 4, 5, 6, 7]
+                quote: false
       - name: day_name
         description: "Day name (Monday, Tuesday, etc.)."
         data_tests:
@@ -42,6 +43,7 @@ models:
           - accepted_values:
               arguments:
                 values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+                quote: false
       - name: observation_count
         description: "Total number of 10-minute snapshot observations in this time slot over the lookback window."
         data_tests:
