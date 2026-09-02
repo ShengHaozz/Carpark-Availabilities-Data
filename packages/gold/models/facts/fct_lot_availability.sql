@@ -35,11 +35,13 @@ joined as (
         case 
             when d.total_lots is not null and d.total_lots >= s.lots_available 
             then d.total_lots - s.lots_available
+            when d.total_lots is not null and s.lots_available > d.total_lots
+            then 0
             else null 
         end as lots_occupied,
         case 
             when d.total_lots is not null and d.total_lots > 0 
-            then round(cast(d.total_lots - s.lots_available as double) / cast(d.total_lots as double), 4)
+            then greatest(0.0, least(1.0, round(cast(d.total_lots - s.lots_available as double) / cast(d.total_lots as double), 4)))
             else null 
         end as occupancy_rate,
         case 

@@ -107,7 +107,7 @@ def test_handler_eventbridge_event(tmp_path: Path, monkeypatch):
         patch(
             "packages.gold.src.gold.handler.setup_dbt_environment",
             return_value=tmp_path,
-        ) as mock_setup,
+        ),
         patch("packages.gold.src.gold.handler.run_dbt_commands") as mock_run,
     ):
         mock_run.return_value = {"build": "SUCCESS"}
