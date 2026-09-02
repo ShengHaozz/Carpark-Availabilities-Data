@@ -1,0 +1,13 @@
+[project]
+name = "notifier"
+version = "0.1.0"
+description = "AWS Step Functions to Telegram Alert Notifier"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "boto3>=1.35.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.10,<0.11.0"]
+build-backend = "uv_build"

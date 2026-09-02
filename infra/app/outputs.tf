@@ -8,3 +8,10 @@ output "bucket_arn" {
   value       = aws_s3_bucket.bucket.arn
 }
 
+output "bronze_lambda_arns" {
+  description = "ARNs of the Bronze ingestion Lambdas"
+  value = [
+    module.bronze_lambda.functions["lta_datamall"].arn,
+    module.bronze_lambda.functions["hdb_data"].arn,
+  ]
+}

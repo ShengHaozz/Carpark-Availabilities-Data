@@ -11,12 +11,13 @@ REPO_URL   ?= $(ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_REPO_NAME)
 WORKSPACE  := $(shell pwd)
 FUNCS      := silver_cold gold
 
-.PHONY: terraform_init profile bootstrap login build push digests apply deploy
+.PHONY: terraform_init profile bootstrap ecr_up ecr_down notif_up notif_down login build push digests apply deploy
 
 terraform_init:
 	terraform -chdir=infra/app init
 	terraform -chdir=infra/bootstrap init
 	terraform -chdir=infra/ecr init
+	terraform -chdir=infra/notifications init
 
 profile: terraform_init
 	@test -n "$(TF_VAR_ACCESS_KEY)" || (echo "TF_VAR_ACCESS_KEY is not set" && exit 1)
@@ -115,6 +116,22 @@ apply: digests
 deploy: apply
 	@echo "Deployed: $(FUNCS)"
 
+notif_up:
+	@SFN_ARN=$$(terraform -chdir=infra/app output -raw step_function_arn); \
+	BRONZE_LAMBDA_ARNS=$$(terraform -chdir=infra/app output -json bronze_lambda_arns); \
+	terraform -chdir=infra/notifications apply \
+		-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
+		-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
+		-var="state_machine_arns=[\"$$SFN_ARN\"]" \
+		-var="bronze_lambda_arns=$$BRONZE_LAMBDA_ARNS" \
+		-auto-approve
+
+notif_down:
+	@terraform -chdir=infra/notifications destroy \
+	-var="telegram_bot_token=$(TELEGRAM_BOT_TOKEN)" \
+	-var="telegram_chat_id=$(TELEGRAM_CHAT_ID)" \
+	-auto-approve
+
 dbt_parse:
 	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
 	uv run --package gold dbt parse --project-dir packages/gold --profiles-dir packages/gold
@@ -134,4 +151,5 @@ dbt_run:
 dbt_test:
 	@S3_BUCKET=$$(terraform -chdir=infra/app output -raw bucket_name) \
 	uv run --package gold dbt test --project-dir packages/gold --profiles-dir packages/gold
-
+
+
