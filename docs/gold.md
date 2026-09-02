@@ -24,7 +24,7 @@ flowchart TD
 
     LambdaGold --> Setup
     DbtSnap & DbtRun & DbtTest --> Athena["Amazon Athena & Glue Catalog"]
-    Athena --> S3Gold[("S3: gold/\nIceberg Tables")]
+    Athena --> S3Gold[("S3: level=gold/\nIceberg Tables")]
 ```
 
 ---

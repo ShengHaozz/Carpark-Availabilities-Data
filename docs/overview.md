@@ -51,7 +51,7 @@ flowchart TD
         Snapshots["snp_carpark\n(SCD Type 2 Snapshot)"]
         DimCarpark["dim_carpark\n(SCD2 Dimension)"]
         FctAvailability["fct_lot_availability\n(Daily Partitioned Fact)"]
-        S3_Gold[("S3: gold/\nIceberg Tables")]
+        S3_Gold[("S3: level=gold/\nIceberg Tables")]
 
         Lambda_Silver -->|Task 2 on Success| Lambda_Gold
         Lambda_Gold --> Athena

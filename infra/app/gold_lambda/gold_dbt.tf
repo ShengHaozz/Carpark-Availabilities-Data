@@ -63,7 +63,7 @@ resource "aws_iam_role_policy" "gold_dbt_s3_policy" {
           "s3:ListMultipartUploadParts"
         ]
         Resource = [
-          "${var.s3_bucket.arn}/gold/*",
+          "${var.s3_bucket.arn}/level=gold/*",
           "${var.s3_bucket.arn}/athena-query-results/*"
         ]
       }
