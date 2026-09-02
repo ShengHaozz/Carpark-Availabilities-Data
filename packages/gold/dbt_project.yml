@@ -42,4 +42,9 @@ models:
       +materialized: incremental
       +table_type: iceberg
       +schema: gold
+    marts:
+      +materialized: table
+      +table_type: iceberg
+      +schema: marts
+
 
