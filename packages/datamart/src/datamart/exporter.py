@@ -1,15 +1,15 @@
-"""Tabular-to-JSON streaming serialization module for the Carpark Availabilities Datamart."""
+"""Tabular-to-JSON serialization module for the Carpark Availabilities Datamart."""
 
 from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timezone
 import gzip
-import itertools
 import json
-from typing import Any, BinaryIO, Dict, Iterable, Iterator, List, Optional, TextIO
+from typing import Any, Dict, List, Optional
 
-from gold.datamart_schema import (
+from datamart.schema import (
+    DATAMART_SCHEMA_VERSION,
     CarparkMetadata,
     CarparkWeeklyDistributionDocument,
     Coordinates,
@@ -40,7 +40,7 @@ DAY_NAMES = {
 
 def _safe_float(val: Any) -> Optional[float]:
     """Safely converts numerical value to float rounded to 4 decimals, or None if null."""
-    if val is None:
+    if val is None or val == "" or str(val).lower() == "null":
         return None
     try:
         return round(float(val), 4)
@@ -59,7 +59,7 @@ def _build_percentile_stats(
     mean: Any,
     std_dev: Any,
 ) -> Optional[PercentileStats]:
-    """Constructs a PercentileStats object if median is not None."""
+    """Constructs a PercentileStats object if median and bounds are present."""
     if p50 is None or min_val is None or max_val is None:
         return None
     return PercentileStats(
@@ -76,26 +76,34 @@ def _build_percentile_stats(
 
 
 def _build_carpark_metadata(
-    carpark_id: str,
-    lot_type: str,
-    sample_row: Dict[str, Any],
+    carpark_id: str, lot_type: str, sample_row: Dict[str, Any]
 ) -> CarparkMetadata:
-    """Extracts and formats carpark metadata from a sample mart record."""
+    """Builds CarparkMetadata object from a sample row."""
     total_lots = sample_row.get("total_lots")
-    if total_lots is not None:
-        total_lots = int(total_lots)
+    if total_lots is not None and total_lots != "":
+        try:
+            total_lots = int(total_lots)
+        except (ValueError, TypeError):
+            total_lots = None
+    else:
+        total_lots = None
 
     has_capacity = bool(
-        sample_row.get("has_capacity_data", total_lots is not None and total_lots > 0)
+        sample_row.get(
+            "has_capacity_data", total_lots is not None and total_lots > 0
+        )
     )
 
     lat = sample_row.get("location_latitude")
     lon = sample_row.get("location_longitude")
     coords = None
-    if lat is not None and lon is not None:
-        coords = Coordinates(
-            latitude=round(float(lat), 6), longitude=round(float(lon), 6)
-        )
+    if lat is not None and lon is not None and lat != "" and lon != "":
+        try:
+            coords = Coordinates(
+                latitude=round(float(lat), 6), longitude=round(float(lon), 6)
+            )
+        except (ValueError, TypeError):
+            coords = None
 
     return CarparkMetadata(
         carpark_id=carpark_id,
@@ -112,21 +120,21 @@ def _build_carpark_metadata(
     )
 
 
-def _build_hourly_distribution(hr_row: Dict[str, Any]) -> HourlyDistribution:
-    """Constructs an HourlyDistribution object from a single hourly mart record."""
-    h_int = int(hr_row["hour_of_day_sgt"])
-    obs_count = int(hr_row.get("observation_count", 0))
+def _build_hourly_distribution(hr: Dict[str, Any]) -> HourlyDistribution:
+    """Constructs HourlyDistribution from a single hourly mart row."""
+    h_int = int(hr["hour_of_day_sgt"])
+    obs_count = int(hr.get("observation_count", 0))
 
     lots_avail = _build_percentile_stats(
-        min_val=hr_row.get("lots_avail_min"),
-        p10=hr_row.get("lots_avail_p10"),
-        p25=hr_row.get("lots_avail_p25"),
-        p50=hr_row.get("lots_avail_median"),
-        p75=hr_row.get("lots_avail_p75"),
-        p90=hr_row.get("lots_avail_p90"),
-        max_val=hr_row.get("lots_avail_max"),
-        mean=hr_row.get("lots_avail_mean"),
-        std_dev=hr_row.get("lots_avail_stddev"),
+        min_val=hr.get("lots_avail_min"),
+        p10=hr.get("lots_avail_p10"),
+        p25=hr.get("lots_avail_p25"),
+        p50=hr.get("lots_avail_median"),
+        p75=hr.get("lots_avail_p75"),
+        p90=hr.get("lots_avail_p90"),
+        max_val=hr.get("lots_avail_max"),
+        mean=hr.get("lots_avail_mean"),
+        std_dev=hr.get("lots_avail_stddev"),
     )
     if lots_avail is None:
         lots_avail = PercentileStats(
@@ -142,31 +150,31 @@ def _build_hourly_distribution(hr_row: Dict[str, Any]) -> HourlyDistribution:
         )
 
     lots_occ = _build_percentile_stats(
-        min_val=hr_row.get("lots_occ_min"),
-        p10=hr_row.get("lots_occ_p10"),
-        p25=hr_row.get("lots_occ_p25"),
-        p50=hr_row.get("lots_occ_median"),
-        p75=hr_row.get("lots_occ_p75"),
-        p90=hr_row.get("lots_occ_p90"),
-        max_val=hr_row.get("lots_occ_max"),
-        mean=hr_row.get("lots_occ_mean"),
-        std_dev=hr_row.get("lots_occ_stddev"),
+        min_val=hr.get("lots_occ_min"),
+        p10=hr.get("lots_occ_p10"),
+        p25=hr.get("lots_occ_p25"),
+        p50=hr.get("lots_occ_median"),
+        p75=hr.get("lots_occ_p75"),
+        p90=hr.get("lots_occ_p90"),
+        max_val=hr.get("lots_occ_max"),
+        mean=hr.get("lots_occ_mean"),
+        std_dev=hr.get("lots_occ_stddev"),
     )
 
     occ_rate = _build_percentile_stats(
-        min_val=hr_row.get("occupancy_min"),
-        p10=hr_row.get("occupancy_p10"),
-        p25=hr_row.get("occupancy_p25"),
-        p50=hr_row.get("occupancy_median"),
-        p75=hr_row.get("occupancy_p75"),
-        p90=hr_row.get("occupancy_p90"),
-        max_val=hr_row.get("occupancy_max"),
-        mean=hr_row.get("occupancy_mean"),
-        std_dev=hr_row.get("occupancy_stddev"),
+        min_val=hr.get("occupancy_min"),
+        p10=hr.get("occupancy_p10"),
+        p25=hr.get("occupancy_p25"),
+        p50=hr.get("occupancy_median"),
+        p75=hr.get("occupancy_p75"),
+        p90=hr.get("occupancy_p90"),
+        max_val=hr.get("occupancy_max"),
+        mean=hr.get("occupancy_mean"),
+        std_dev=hr.get("occupancy_stddev"),
     )
 
-    prob_full = _safe_float(hr_row.get("probability_full")) or 0.0
-    prob_high_occ = _safe_float(hr_row.get("probability_high_occupancy"))
+    prob_full = _safe_float(hr.get("probability_full")) or 0.0
+    prob_high_occ = _safe_float(hr.get("probability_high_occupancy"))
 
     return HourlyDistribution(
         hour_of_day_sgt=h_int,
@@ -180,10 +188,11 @@ def _build_hourly_distribution(hr_row: Dict[str, Any]) -> HourlyDistribution:
     )
 
 
-def _build_daily_summary(
-    dow_rows: List[Dict[str, Any]],
-) -> Optional[DailySummary]:
-    """Calculates full-day aggregated statistics across 24 hourly buckets."""
+def _build_daily_summary(dow_rows: List[Dict[str, Any]]) -> Optional[DailySummary]:
+    """Computes full-day aggregated summary from a list of hourly rows for that day."""
+    if not dow_rows:
+        return None
+
     day_obs_count = 0
     day_avail_mins: List[float] = []
     day_avail_maxs: List[float] = []
@@ -207,15 +216,14 @@ def _build_daily_summary(
         if hr.get("lots_avail_mean") is not None:
             day_avail_means.append((float(hr["lots_avail_mean"]), obs_count))
 
-        if hr.get("occupancy_min") is not None:
+        if hr.get("occupancy_median") is not None:
             has_occ_rows = True
-            day_occ_mins.append(float(hr["occupancy_min"]))
-        if hr.get("occupancy_max") is not None:
-            has_occ_rows = True
-            day_occ_maxs.append(float(hr["occupancy_max"]))
-        if hr.get("occupancy_mean") is not None:
-            has_occ_rows = True
-            day_occ_means.append((float(hr["occupancy_mean"]), obs_count))
+            if hr.get("occupancy_min") is not None:
+                day_occ_mins.append(float(hr["occupancy_min"]))
+            if hr.get("occupancy_max") is not None:
+                day_occ_maxs.append(float(hr["occupancy_max"]))
+            if hr.get("occupancy_mean") is not None:
+                day_occ_means.append((float(hr["occupancy_mean"]), obs_count))
 
         prob_full = _safe_float(hr.get("probability_full")) or 0.0
         day_full_sum += prob_full * obs_count
@@ -295,22 +303,10 @@ def build_carpark_document(
     generated_at: str,
     lookback_window_days: int = 60,
 ) -> CarparkWeeklyDistributionDocument:
-    """Transforms the collection of rows for a single carpark and lot type into a CarparkWeeklyDistributionDocument.
-
-    Args:
-        carpark_id: Carpark identifier (e.g., 'ACB').
-        lot_type: Lot type code (e.g., 'C').
-        rows: List of mart rows belonging to this carpark and lot type.
-        generated_at: ISO 8601 timestamp string for metadata.
-        lookback_window_days: Number of historical days aggregated (default 60).
-
-    Returns:
-        Structured CarparkWeeklyDistributionDocument.
-    """
+    """Transforms the collection of rows for a single carpark and lot type into a CarparkWeeklyDistributionDocument."""
     sample_row = rows[0] if rows else {}
     carpark_meta = _build_carpark_metadata(carpark_id, lot_type, sample_row)
 
-    # Organize rows by day of week (1 to 7)
     day_rows: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
     total_obs = 0
     for r in rows:
@@ -323,7 +319,7 @@ def build_carpark_document(
     }
 
     metadata = DatamartMetadata(
-        version="1.0.0",
+        version=DATAMART_SCHEMA_VERSION,
         generated_at=generated_at,
         timezone="Asia/Singapore (UTC+8)",
         lookback_window_days=lookback_window_days,
@@ -337,61 +333,30 @@ def build_carpark_document(
     )
 
 
-def iter_carpark_documents(
-    records: Iterable[Dict[str, Any]],
+def build_carpark_documents(
+    records: List[Dict[str, Any]],
     generated_at: Optional[str] = None,
     lookback_window_days: int = 60,
-    is_sorted_by_carpark: bool = True,
-) -> Iterator[CarparkWeeklyDistributionDocument]:
-    """Streams structured CarparkWeeklyDistributionDocuments one carpark at a time.
-
-    Args:
-        records: Iterable of dicts containing columns from mart_carpark_day_of_week_distribution.
-        generated_at: ISO 8601 timestamp string (defaults to current UTC time).
-        lookback_window_days: Number of historical days aggregated (default 60).
-        is_sorted_by_carpark: True if input records are pre-sorted by (carpark_id, lot_type),
-                             enabling zero-buffering streaming.
-
-    Yields:
-        CarparkWeeklyDistributionDocument instances incrementally.
-    """
+) -> List[CarparkWeeklyDistributionDocument]:
+    """Transforms query records into a list of CarparkWeeklyDistributionDocuments."""
     if generated_at is None:
         generated_at = datetime.now(timezone.utc).isoformat()
 
-    if is_sorted_by_carpark:
-        for (carpark_id, lot_type), group in itertools.groupby(
-            records, key=lambda r: (str(r["carpark_id"]), str(r["lot_type"]))
-        ):
-            yield build_carpark_document(
-                carpark_id=carpark_id,
-                lot_type=lot_type,
-                rows=list(group),
-                generated_at=generated_at,
-                lookback_window_days=lookback_window_days,
-            )
-    else:
-        grouped_records: Dict[tuple[str, str], List[Dict[str, Any]]] = defaultdict(list)
-        for record in records:
-            key = (str(record["carpark_id"]), str(record["lot_type"]))
-            grouped_records[key].append(record)
+    grouped: Dict[tuple[str, str], List[Dict[str, Any]]] = defaultdict(list)
+    for record in records:
+        key = (str(record["carpark_id"]), str(record["lot_type"]))
+        grouped[key].append(record)
 
-        for (carpark_id, lot_type), rows in grouped_records.items():
-            yield build_carpark_document(
-                carpark_id=carpark_id,
-                lot_type=lot_type,
-                rows=rows,
-                generated_at=generated_at,
-                lookback_window_days=lookback_window_days,
-            )
-
-
-def write_carpark_document_json(
-    document: CarparkWeeklyDistributionDocument,
-    fp: TextIO,
-    indent: Optional[int] = 2,
-) -> None:
-    """Streams a CarparkWeeklyDistributionDocument to a text stream formatted as JSON."""
-    json.dump(document.to_dict(), fp, indent=indent)
+    return [
+        build_carpark_document(
+            carpark_id=carpark_id,
+            lot_type=lot_type,
+            rows=rows,
+            generated_at=generated_at,
+            lookback_window_days=lookback_window_days,
+        )
+        for (carpark_id, lot_type), rows in grouped.items()
+    ]
 
 
 def dump_carpark_document_json(
@@ -402,38 +367,20 @@ def dump_carpark_document_json(
     return json.dumps(document.to_dict(), indent=indent)
 
 
-def stream_bundle_gzip(
-    documents: Iterable[CarparkWeeklyDistributionDocument],
-    out_fp: BinaryIO,
+def create_summary_bundle_gzip(
+    documents: List[CarparkWeeklyDistributionDocument],
     generated_at: Optional[str] = None,
-) -> int:
-    """Streams an iterable of carpark documents into a compressed GZIP JSON bundle directly to out_fp.
-
-    Args:
-        documents: Iterable of CarparkWeeklyDistributionDocument objects.
-        out_fp: Binary stream where compressed GZIP bytes are written.
-        generated_at: ISO 8601 timestamp string (defaults to current UTC time).
-
-    Returns:
-        Total number of carpark documents written to the bundle.
-    """
+) -> bytes:
+    """Serializes and compresses all carpark documents into a GZIP JSON bundle."""
     if generated_at is None:
         generated_at = datetime.now(timezone.utc).isoformat()
 
-    count = 0
-    with gzip.GzipFile(fileobj=out_fp, mode="wb") as gz:
-        header = (
-            f'{{"metadata":{{"version":"1.0.0","generated_at":"{generated_at}"}},"carparks":['
-        ).encode("utf-8")
-        gz.write(header)
-
-        for doc in documents:
-            if count > 0:
-                gz.write(b",")
-            doc_bytes = json.dumps(doc.to_dict(), separators=(",", ":")).encode("utf-8")
-            gz.write(doc_bytes)
-            count += 1
-
-        gz.write(b"]}")
-
-    return count
+    payload = {
+        "metadata": {
+            "version": DATAMART_SCHEMA_VERSION,
+            "generated_at": generated_at,
+        },
+        "carparks": [doc.to_dict() for doc in documents],
+    }
+    raw_json = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    return gzip.compress(raw_json)

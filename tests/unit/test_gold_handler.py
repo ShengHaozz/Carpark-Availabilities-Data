@@ -57,6 +57,7 @@ def test_run_dbt_commands_failure(tmp_path: Path):
 def test_handler_dev_mode(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("ENV", "dev")
     monkeypatch.setenv("DBT_PROJECT_DIR", str(tmp_path))
+    monkeypatch.delenv("S3_BUCKET", raising=False)
 
     with (
         patch(
@@ -80,6 +81,7 @@ def test_handler_dev_mode(tmp_path: Path, monkeypatch):
 def test_handler_prod_mode(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("ENV", "prod")
     monkeypatch.setenv("LAMBDA_TASK_ROOT", str(tmp_path))
+    monkeypatch.delenv("S3_BUCKET", raising=False)
 
     with (
         patch(
@@ -102,6 +104,7 @@ def test_handler_prod_mode(tmp_path: Path, monkeypatch):
 def test_handler_eventbridge_event(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("ENV", "prod")
     monkeypatch.setenv("LAMBDA_TASK_ROOT", str(tmp_path))
+    monkeypatch.delenv("S3_BUCKET", raising=False)
 
     with (
         patch(
