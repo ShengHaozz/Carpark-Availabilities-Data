@@ -14,7 +14,7 @@ resource "aws_iam_role" "step_functions_role" {
   })
 }
 
-# IAM Policy to Invoke Silver and Gold Lambda Functions
+# IAM Policy to Invoke Silver, Gold, and Datamart Lambda Functions
 resource "aws_iam_role_policy" "step_functions_lambda_policy" {
   name = "step-functions-lambda-invoke"
   role = aws_iam_role.step_functions_role.name
@@ -32,7 +32,9 @@ resource "aws_iam_role_policy" "step_functions_lambda_policy" {
           module.silver_lambda.functions["silver_cold"].arn,
           "${module.silver_lambda.functions["silver_cold"].arn}:*",
           module.gold_lambda.functions["gold_dbt"].arn,
-          "${module.gold_lambda.functions["gold_dbt"].arn}:*"
+          "${module.gold_lambda.functions["gold_dbt"].arn}:*",
+          module.datamart_lambda.functions["datamart_publisher"].arn,
+          "${module.datamart_lambda.functions["datamart_publisher"].arn}:*"
         ]
       }
     ]
@@ -85,7 +87,7 @@ resource "aws_sfn_state_machine" "carpark_daily_pipeline" {
   }
 
   definition = jsonencode({
-    Comment = "Daily Carpark Pipeline: Transforms Bronze to Silver Cold Parquet, then executes Gold dbt models and tests."
+    Comment = "Daily Carpark Pipeline: Transforms Bronze to Silver Cold Parquet, executes Gold dbt models, and publishes edge JSON Datamart."
     StartAt = "TransformSilver"
     States = {
       TransformSilver = {
@@ -146,6 +148,36 @@ resource "aws_sfn_state_machine" "carpark_daily_pipeline" {
             Next        = "PipelineFailed"
           }
         ]
+        Next = "PublishDatamart"
+      }
+      PublishDatamart = {
+        Type       = "Task"
+        Resource   = "arn:aws:states:::lambda:invoke"
+        ResultPath = "$.datamart_result"
+        Parameters = {
+          "FunctionName" = module.datamart_lambda.functions["datamart_publisher"].arn
+          "Payload.$"    = "$"
+        }
+        Retry = [
+          {
+            ErrorEquals = [
+              "Lambda.ServiceException",
+              "Lambda.AWSLambdaException",
+              "Lambda.SdkClientException",
+              "Lambda.TooManyRequestsException"
+            ]
+            IntervalSeconds = 10
+            MaxAttempts     = 2
+            BackoffRate     = 2.0
+          }
+        ]
+        Catch = [
+          {
+            ErrorEquals = ["States.ALL"]
+            ResultPath  = "$.error"
+            Next        = "PipelineFailed"
+          }
+        ]
         Next = "PipelineSucceeded"
       }
       PipelineSucceeded = {
@@ -164,4 +196,3 @@ output "step_function_arn" {
   value       = aws_sfn_state_machine.carpark_daily_pipeline.arn
   description = "ARN of the Step Functions Daily Pipeline State Machine"
 }
-

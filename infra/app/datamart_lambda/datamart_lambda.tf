@@ -1,8 +1,16 @@
 data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
-resource "aws_iam_role" "lambda_role_gold_dbt" {
-  name = "lambda_role_gold_dbt"
+# Archive python package source for lightweight deployment (Zero heavy container needed)
+data "archive_file" "datamart_zip" {
+  type        = "zip"
+  source_dir  = "${path.root}/../../packages/datamart/src"
+  output_path = "${path.module}/lambda/datamart.zip"
+}
+
+# IAM Role for Datamart Publisher Lambda
+resource "aws_iam_role" "lambda_role_datamart_publisher" {
+  name = "lambda_role_datamart_publisher"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -16,16 +24,16 @@ resource "aws_iam_role" "lambda_role_gold_dbt" {
   })
 }
 
-# CloudWatch Logs Permission
-resource "aws_iam_role_policy_attachment" "gold_dbt_lambda_logs" {
-  role       = aws_iam_role.lambda_role_gold_dbt.name
+# CloudWatch Logs Basic Execution
+resource "aws_iam_role_policy_attachment" "datamart_publisher_lambda_logs" {
+  role       = aws_iam_role.lambda_role_datamart_publisher.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# S3 Policy (Read Silver, Write Gold Iceberg & Athena Query Results)
-resource "aws_iam_role_policy" "gold_dbt_s3_policy" {
-  name = "gold-dbt-s3-policy"
-  role = aws_iam_role.lambda_role_gold_dbt.name
+# S3 Policy: Read Athena query results & Put datamart JSON documents
+resource "aws_iam_role_policy" "datamart_s3_policy" {
+  name = "datamart-publisher-s3-policy"
+  role = aws_iam_role.lambda_role_datamart_publisher.name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -35,35 +43,33 @@ resource "aws_iam_role_policy" "gold_dbt_s3_policy" {
         Effect = "Allow"
         Action = [
           "s3:ListBucket",
-          "s3:GetBucketLocation",
-          "s3:ListBucketMultipartUploads"
+          "s3:GetBucketLocation"
         ]
         Resource = [
           var.s3_bucket.arn
         ]
       },
       {
-        Sid    = "ReadSilverData"
+        Sid    = "ReadAthenaQueryResults"
         Effect = "Allow"
         Action = [
           "s3:GetObject"
         ]
         Resource = [
-          "${var.s3_bucket.arn}/level=silver/*"
+          "${var.s3_bucket.arn}/athena-query-results/*"
         ]
       },
       {
-        Sid    = "ReadWriteGoldDatamartAndAthena"
+        Sid    = "WriteDatamartDocuments"
         Effect = "Allow"
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          "s3:DeleteObject",
           "s3:AbortMultipartUpload",
           "s3:ListMultipartUploadParts"
         ]
         Resource = [
-          "${var.s3_bucket.arn}/level=gold/*",
+          "${var.s3_bucket.arn}/level=datamart/*",
           "${var.s3_bucket.arn}/athena-query-results/*"
         ]
       }
@@ -72,9 +78,9 @@ resource "aws_iam_role_policy" "gold_dbt_s3_policy" {
 }
 
 # Athena Query Execution Policy (Scoped to primary workgroup)
-resource "aws_iam_role_policy" "gold_dbt_athena_policy" {
-  name = "gold-dbt-athena-policy"
-  role = aws_iam_role.lambda_role_gold_dbt.name
+resource "aws_iam_role_policy" "datamart_athena_policy" {
+  name = "datamart-publisher-athena-policy"
+  role = aws_iam_role.lambda_role_datamart_publisher.name
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -100,8 +106,7 @@ resource "aws_iam_role_policy" "gold_dbt_athena_policy" {
           "athena:GetDataCatalog",
           "athena:GetDatabase",
           "athena:GetTableMetadata",
-          "athena:ListWorkGroups",
-          "athena:ListEngineVersions"
+          "athena:ListWorkGroups"
         ]
         Resource = "*"
       }
@@ -109,16 +114,16 @@ resource "aws_iam_role_policy" "gold_dbt_athena_policy" {
   })
 }
 
-# Glue Data Catalog Policy (Separated Read vs Write by Layer)
-resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
-  name = "gold-dbt-glue-policy"
-  role = aws_iam_role.lambda_role_gold_dbt.name
+# Glue Data Catalog Read-Only Policy for Gold Marts
+resource "aws_iam_role_policy" "datamart_glue_policy" {
+  name = "datamart-publisher-glue-policy"
+  role = aws_iam_role.lambda_role_datamart_publisher.name
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "GlueCatalogAndDatabaseRead"
+        Sid    = "GlueCatalogAndMartsRead"
         Effect = "Allow"
         Action = [
           "glue:GetDatabases",
@@ -133,30 +138,6 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
         ]
         Resource = [
           "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/silver",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/prod_*",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/silver/*",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/prod_*/*"
-        ]
-      },
-      {
-        Sid    = "GlueGoldTableAndDatabaseManagement"
-        Effect = "Allow"
-        Action = [
-          "glue:CreateDatabase",
-          "glue:UpdateDatabase",
-          "glue:CreateTable",
-          "glue:UpdateTable",
-          "glue:DeleteTable",
-          "glue:BatchDeleteTable",
-          "glue:DeleteTableVersion",
-          "glue:BatchDeleteTableVersion",
-          "glue:BatchCreatePartition",
-          "glue:BatchDeletePartition",
-          "glue:BatchUpdatePartition"
-        ]
-        Resource = [
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
           "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/prod_*",
           "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/prod_*/*"
         ]
@@ -165,21 +146,27 @@ resource "aws_iam_role_policy" "gold_dbt_glue_policy" {
   })
 }
 
-# Lambda Function
-resource "aws_lambda_function" "gold_dbt_lambda" {
-  function_name = "gold_dbt_lambda"
-  role          = aws_iam_role.lambda_role_gold_dbt.arn
-  package_type  = "Image"
-  image_uri     = "${var.repo_url}@${var.image_digest}"
+# Dedicated Datamart Lambda Function (Zip-based, lightweight, arm64)
+resource "aws_lambda_function" "datamart_publisher_lambda" {
+  function_name = "datamart_publisher_lambda"
+  role          = aws_iam_role.lambda_role_datamart_publisher.arn
+  runtime       = "python3.12"
+  handler       = "datamart.handler.handler"
+
+  filename         = data.archive_file.datamart_zip.output_path
+  source_code_hash = data.archive_file.datamart_zip.output_base64sha256
 
   architectures = ["arm64"]
-  memory_size   = 1024
-  timeout       = 600
+  memory_size   = 512
+  timeout       = 300
 
   environment {
     variables = {
-      ENV       = "prod"
-      S3_BUCKET = var.s3_bucket.id
+      ENV              = "prod"
+      S3_BUCKET        = var.s3_bucket.id
+      DATABASE         = "prod_marts"
+      TABLE_NAME       = "mart_carpark_day_of_week_distribution"
+      DATAMART_VERSION = "v1"
     }
   }
 }
