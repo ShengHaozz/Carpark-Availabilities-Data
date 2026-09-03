@@ -8,6 +8,11 @@ output "bucket_arn" {
   value       = aws_s3_bucket.bucket.arn
 }
 
+output "access_log_bucket_name" {
+  description = "Bucket that retains S3 server access logs for 30 days"
+  value       = aws_s3_bucket.access_logs.bucket
+}
+
 output "bronze_lambda_arns" {
   description = "ARNs of the Bronze ingestion Lambdas"
   value = [
