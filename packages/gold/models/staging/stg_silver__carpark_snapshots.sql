@@ -1,5 +1,9 @@
 with source_data as (
     select * from {{ source('silver', 'silver_cold') }}
+    {% if not flags.FULL_REFRESH %}
+    -- Leave the predicate out for full refreshes so they intentionally read all history.
+    where {{ recent_silver_partition_predicate() }}
+    {% endif %}
 ),
 
 typed_and_cleaned as (
@@ -46,4 +50,3 @@ select
     source_filepath
 from typed_and_cleaned
 where row_num = 1
-
