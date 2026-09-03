@@ -20,3 +20,18 @@ output "bronze_lambda_arns" {
     module.bronze_lambda.functions["hdb_data"].arn,
   ]
 }
+
+output "cloudfront_distribution_id" {
+  description = "ID of the CloudFront Datamart distribution"
+  value       = aws_cloudfront_distribution.datamart_cdn.id
+}
+
+output "cloudfront_distribution_domain_name" {
+  description = "Public domain name of the CloudFront Datamart distribution (e.g. d123456.cloudfront.net)"
+  value       = aws_cloudfront_distribution.datamart_cdn.domain_name
+}
+
+output "cloudfront_distribution_arn" {
+  description = "ARN of the CloudFront Datamart distribution"
+  value       = aws_cloudfront_distribution.datamart_cdn.arn
+}

@@ -99,3 +99,33 @@ resource "aws_s3_bucket_logging" "bucket" {
 
   depends_on = [aws_s3_bucket_policy.access_logs]
 }
+
+# S3 Bucket Policy for CloudFront Origin Access Control (OAC)
+data "aws_iam_policy_document" "datamart_s3_bucket_policy" {
+  statement {
+    sid    = "AllowCloudFrontServicePrincipalReadOnly"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    actions = ["s3:GetObject"]
+
+    resources = [
+      "${aws_s3_bucket.bucket.arn}/level=datamart/*"
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.datamart_cdn.arn]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "bucket" {
+  bucket = aws_s3_bucket.bucket.id
+  policy = data.aws_iam_policy_document.datamart_s3_bucket_policy.json
+}

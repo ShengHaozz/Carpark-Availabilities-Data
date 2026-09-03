@@ -32,3 +32,17 @@ variable "ecr_repo_url" {
   type        = string
   description = "URL for ECR Repository"
 }
+
+# NOTE: Update this variable with your specific Vercel production domain
+# (e.g. ["https://my-carpark-app.vercel.app", "http://localhost:3000"]) when deploying frontend.
+variable "cors_allowed_origins" {
+  type        = list(string)
+  description = "Allowed origins for Datamart CloudFront CORS (Change to your Vercel site URL for production)"
+  default     = ["*"]
+}
+
+variable "datamart_version" {
+  type        = string
+  description = "API version route prefix for Datamart files in S3"
+  default     = "v1"
+}
