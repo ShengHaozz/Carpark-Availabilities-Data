@@ -1,13 +1,16 @@
-"""Unit tests for Carpark JSON Datamart schema and serialization exporter."""
+"""Unit tests for Carpark JSON Datamart schema and streaming serialization exporter."""
 
 import gzip
+import io
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterator, List
 
 from gold.exporter import (
-    serialize_carpark_document_json,
-    serialize_documents_bundle_gzip,
-    transform_mart_records_to_documents,
+    build_carpark_document,
+    dump_carpark_document_json,
+    iter_carpark_documents,
+    stream_bundle_gzip,
+    write_carpark_document_json,
 )
 
 
@@ -131,15 +134,15 @@ def _sample_non_hdb_mart_rows() -> List[Dict[str, Any]]:
     return rows
 
 
-def test_hdb_carpark_transformation():
-    """Verifies complete contract generation for HDB carparks with capacity."""
+def test_hdb_carpark_streaming_transformation():
+    """Verifies complete contract generation for HDB carparks with capacity via iter_carpark_documents."""
     raw_rows = _sample_hdb_mart_rows()
-    documents = transform_mart_records_to_documents(
-        raw_rows, generated_at="2026-09-02T00:15:00+08:00"
+    docs = list(
+        iter_carpark_documents(raw_rows, generated_at="2026-09-02T00:15:00+08:00")
     )
 
-    assert "ACB_C" in documents
-    doc = documents["ACB_C"]
+    assert len(docs) == 1
+    doc = docs[0]
 
     # Carpark Metadata assertions
     assert doc.carpark.carpark_id == "ACB"
@@ -154,7 +157,7 @@ def test_hdb_carpark_transformation():
 
     # Weekly distribution structure
     assert len(doc.weekly_distribution) == 7
-    mon = doc.weekly_distribution["1"]
+    mon = doc.weekly_distribution[1]
     assert mon.day_name == "Monday"
     assert mon.day_of_week == 1
     assert mon.is_weekend is False
@@ -171,15 +174,15 @@ def test_hdb_carpark_transformation():
     assert h8.probability_high_occupancy_ge_90pct == 0.3500
 
 
-def test_non_hdb_carpark_transformation():
+def test_non_hdb_carpark_streaming_transformation():
     """Verifies non-HDB carparks without capacity emit null occupancy metrics cleanly."""
     raw_rows = _sample_non_hdb_mart_rows()
-    documents = transform_mart_records_to_documents(
-        raw_rows, generated_at="2026-09-02T00:15:00+08:00"
+    docs = list(
+        iter_carpark_documents(raw_rows, generated_at="2026-09-02T00:15:00+08:00")
     )
 
-    assert "SUNTEC_C" in documents
-    doc = documents["SUNTEC_C"]
+    assert len(docs) == 1
+    doc = docs[0]
 
     # Carpark Metadata assertions
     assert doc.carpark.carpark_id == "SUNTEC"
@@ -188,7 +191,7 @@ def test_non_hdb_carpark_transformation():
     assert doc.carpark.has_capacity_data is False
 
     # Hourly distribution assertions
-    mon = doc.weekly_distribution["1"]
+    mon = doc.weekly_distribution[1]
     assert len(mon.hourly_distribution) == 2
     h12 = mon.hourly_distribution[0]
     assert h12.hour_of_day_sgt == 12
@@ -199,34 +202,66 @@ def test_non_hdb_carpark_transformation():
     assert h12.probability_high_occupancy_ge_90pct is None
 
 
-def test_json_serialization_fidelity():
-    """Verifies that serialized JSON matches JSON Schema expectations and preserves $schema."""
+def test_build_carpark_document_direct():
+    """Verifies building a single carpark document directly."""
     raw_rows = _sample_hdb_mart_rows()
-    documents = transform_mart_records_to_documents(raw_rows)
-    doc = documents["ACB_C"]
+    doc = build_carpark_document(
+        carpark_id="ACB",
+        lot_type="C",
+        rows=raw_rows,
+        generated_at="2026-09-02T00:15:00+08:00",
+    )
+    assert doc.carpark.carpark_id == "ACB"
+    assert doc.metadata.generated_at == "2026-09-02T00:15:00+08:00"
+    assert doc.weekly_distribution[1].day_name == "Monday"
 
-    json_str = serialize_carpark_document_json(doc)
+
+def test_json_streaming_writers():
+    """Verifies write_carpark_document_json and dump_carpark_document_json."""
+    raw_rows = _sample_hdb_mart_rows()
+    doc = next(iter_carpark_documents(raw_rows))
+
+    # Test dump_carpark_document_json
+    json_str = dump_carpark_document_json(doc)
     parsed = json.loads(json_str)
-
-    assert "$schema" in parsed
-    assert parsed["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+    assert parsed["metadata"]["version"] == "1.0.0"
     assert parsed["carpark"]["carpark_id"] == "ACB"
-    assert parsed["carpark"]["has_capacity_data"] is True
     assert "weekly_distribution" in parsed
     assert "1" in parsed["weekly_distribution"]
 
+    # Test write_carpark_document_json to StringIO stream
+    buf = io.StringIO()
+    write_carpark_document_json(doc, buf)
+    parsed_stream = json.loads(buf.getvalue())
+    assert parsed_stream["carpark"]["carpark_id"] == "ACB"
 
-def test_gzipped_bundle_serialization():
-    """Verifies consolidated GZIP bundle creation and contents."""
+
+def test_stream_bundle_gzip():
+    """Verifies stream_bundle_gzip compresses an iterator of carpark documents."""
     hdb_rows = _sample_hdb_mart_rows()
     non_hdb_rows = _sample_non_hdb_mart_rows()
-    documents = transform_mart_records_to_documents(hdb_rows + non_hdb_rows)
 
-    assert len(documents) == 2
-    gzip_bytes = serialize_documents_bundle_gzip(documents)
+    def row_stream() -> Iterator[Dict[str, Any]]:
+        for r in hdb_rows + non_hdb_rows:
+            yield r
 
-    decompressed = gzip.decompress(gzip_bytes).decode("utf-8")
+    doc_stream = iter_carpark_documents(row_stream(), is_sorted_by_carpark=True)
+
+    out_bytes_io = io.BytesIO()
+    total_written = stream_bundle_gzip(
+        doc_stream, out_bytes_io, generated_at="2026-09-02T00:15:00+08:00"
+    )
+
+    assert total_written == 2
+
+    # Decompress and verify
+    out_bytes_io.seek(0)
+    decompressed = gzip.decompress(out_bytes_io.getvalue()).decode("utf-8")
     parsed_bundle = json.loads(decompressed)
 
-    assert parsed_bundle["metadata"]["total_carparks"] == 2
+    assert parsed_bundle["metadata"]["version"] == "1.0.0"
+    assert parsed_bundle["metadata"]["generated_at"] == "2026-09-02T00:15:00+08:00"
     assert len(parsed_bundle["carparks"]) == 2
+    carpark_ids = [c["carpark"]["carpark_id"] for c in parsed_bundle["carparks"]]
+    assert "ACB" in carpark_ids
+    assert "SUNTEC" in carpark_ids

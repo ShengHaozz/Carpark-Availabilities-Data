@@ -1,187 +1,181 @@
-"""Pydantic data models defining the Carpark Availabilities JSON Datamart contract."""
+"""Data models defining the Carpark Availabilities JSON Datamart contract using standard library dataclasses."""
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional
 
 
-class PercentileStats(BaseModel):
+@dataclass(slots=True)
+class PercentileStats:
     """Statistical five-number summary and key percentiles."""
 
-    model_config = ConfigDict(extra="forbid")
+    min: float
+    p10: float
+    p25: float
+    p50: float
+    p75: float
+    p90: float
+    max: float
+    mean: float
+    std_dev: float
 
-    min: float = Field(..., description="Minimum observed value.")
-    p10: float = Field(..., description="10th percentile observation.")
-    p25: float = Field(..., description="25th percentile (1st quartile) observation.")
-    p50: float = Field(..., description="50th percentile (median) observation.")
-    p75: float = Field(..., description="75th percentile (3rd quartile) observation.")
-    p90: float = Field(..., description="90th percentile observation.")
-    max: float = Field(..., description="Maximum observed value.")
-    mean: float = Field(..., description="Arithmetic mean.")
-    std_dev: float = Field(..., description="Sample standard deviation.")
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
-class Coordinates(BaseModel):
+@dataclass(slots=True)
+class Coordinates:
     """Geographical coordinates (WGS84)."""
 
-    model_config = ConfigDict(extra="forbid")
+    latitude: float
+    longitude: float
 
-    latitude: float = Field(..., description="Latitude coordinate in Singapore.")
-    longitude: float = Field(..., description="Longitude coordinate in Singapore.")
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
-class CarparkMetadata(BaseModel):
+@dataclass(slots=True)
+class CarparkMetadata:
     """Metadata describing the carpark facility and vehicle lot type."""
 
-    model_config = ConfigDict(extra="forbid")
+    carpark_id: str
+    lot_type: str
+    lot_type_description: str
+    agency: str
+    has_capacity_data: bool
+    development: Optional[str] = None
+    area: Optional[str] = None
+    total_lots: Optional[int] = None
+    coordinates: Optional[Coordinates] = None
 
-    carpark_id: str = Field(..., description="Unique carpark identifier.")
-    lot_type: str = Field(..., description="Vehicle lot type code (e.g., C, H, Y).")
-    lot_type_description: str = Field(
-        ..., description="Human-readable lot type (e.g. Cars, Motorcycles)."
-    )
-    development: Optional[str] = Field(
-        None, description="Development or location name."
-    )
-    agency: str = Field(..., description="Managing agency (HDB, LTA, URA).")
-    area: Optional[str] = Field(None, description="Regional area or district.")
-    total_lots: Optional[int] = Field(
-        None, description="Total parking capacity (null if unknown/non-HDB)."
-    )
-    has_capacity_data: bool = Field(
-        ...,
-        description="True if total_lots and occupancy stats are available; false otherwise.",
-    )
-    coordinates: Optional[Coordinates] = Field(
-        None, description="Physical coordinates if known."
-    )
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "carpark_id": self.carpark_id,
+            "lot_type": self.lot_type,
+            "lot_type_description": self.lot_type_description,
+            "development": self.development,
+            "agency": self.agency,
+            "area": self.area,
+            "total_lots": self.total_lots,
+            "has_capacity_data": self.has_capacity_data,
+            "coordinates": self.coordinates.to_dict()
+            if self.coordinates is not None
+            else None,
+        }
 
 
-class HourlyDistribution(BaseModel):
+@dataclass(slots=True)
+class HourlyDistribution:
     """Distribution metrics for a specific 1-hour time window on a given day of the week."""
 
-    model_config = ConfigDict(extra="forbid")
+    hour_of_day_sgt: int
+    time_window: str
+    observation_count: int
+    lots_available: PercentileStats
+    probability_full: float
+    lots_occupied: Optional[PercentileStats] = None
+    occupancy_rate: Optional[PercentileStats] = None
+    probability_high_occupancy_ge_90pct: Optional[float] = None
 
-    hour_of_day_sgt: int = Field(
-        ..., ge=0, le=23, description="Hour of day in Singapore Time (0 to 23)."
-    )
-    time_window: str = Field(
-        ..., description="Human-readable hour window (e.g., '08:00 - 08:59')."
-    )
-    observation_count: int = Field(
-        ..., ge=0, description="Number of snapshot observations analyzed."
-    )
-    lots_available: PercentileStats = Field(
-        ..., description="Distribution of available parking spaces."
-    )
-    lots_occupied: Optional[PercentileStats] = Field(
-        None, description="Distribution of occupied lots (null if capacity unknown)."
-    )
-    occupancy_rate: Optional[PercentileStats] = Field(
-        None, description="Distribution of occupancy percentage (0.0 to 1.0)."
-    )
-    probability_full: float = Field(
-        ...,
-        ge=0.0,
-        le=1.0,
-        description="Empirical probability of 0 available spaces.",
-    )
-    probability_high_occupancy_ge_90pct: Optional[float] = Field(
-        None,
-        ge=0.0,
-        le=1.0,
-        description="Empirical probability of occupancy >= 90% (null if capacity unknown).",
-    )
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "hour_of_day_sgt": self.hour_of_day_sgt,
+            "time_window": self.time_window,
+            "observation_count": self.observation_count,
+            "lots_available": self.lots_available.to_dict(),
+            "lots_occupied": self.lots_occupied.to_dict()
+            if self.lots_occupied is not None
+            else None,
+            "occupancy_rate": self.occupancy_rate.to_dict()
+            if self.occupancy_rate is not None
+            else None,
+            "probability_full": self.probability_full,
+            "probability_high_occupancy_ge_90pct": self.probability_high_occupancy_ge_90pct,
+        }
 
 
-class DailySummary(BaseModel):
+@dataclass(slots=True)
+class DailySummary:
     """Aggregated daily statistical summary for an entire day of the week."""
 
-    model_config = ConfigDict(extra="forbid")
+    observation_count: int
+    lots_available: PercentileStats
+    probability_full: float
+    lots_occupied: Optional[PercentileStats] = None
+    occupancy_rate: Optional[PercentileStats] = None
+    probability_high_occupancy_ge_90pct: Optional[float] = None
 
-    observation_count: int = Field(
-        ..., ge=0, description="Total daily observations across all 24 hours."
-    )
-    lots_available: PercentileStats = Field(
-        ..., description="Full-day distribution of available parking spaces."
-    )
-    lots_occupied: Optional[PercentileStats] = Field(
-        None,
-        description="Full-day distribution of occupied lots (null if capacity unknown).",
-    )
-    occupancy_rate: Optional[PercentileStats] = Field(
-        None,
-        description="Full-day distribution of occupancy rate (null if capacity unknown).",
-    )
-    probability_full: float = Field(
-        ...,
-        ge=0.0,
-        le=1.0,
-        description="Full-day probability of 0 available spaces.",
-    )
-    probability_high_occupancy_ge_90pct: Optional[float] = Field(
-        None,
-        ge=0.0,
-        le=1.0,
-        description="Full-day probability of occupancy >= 90% (null if capacity unknown).",
-    )
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "observation_count": self.observation_count,
+            "lots_available": self.lots_available.to_dict(),
+            "lots_occupied": self.lots_occupied.to_dict()
+            if self.lots_occupied is not None
+            else None,
+            "occupancy_rate": self.occupancy_rate.to_dict()
+            if self.occupancy_rate is not None
+            else None,
+            "probability_full": self.probability_full,
+            "probability_high_occupancy_ge_90pct": self.probability_high_occupancy_ge_90pct,
+        }
 
 
-class DayDistribution(BaseModel):
+@dataclass(slots=True)
+class DayDistribution:
     """Weekly pattern for a single day of the week (1=Monday ... 7=Sunday)."""
 
-    model_config = ConfigDict(extra="forbid")
+    day_name: str
+    day_of_week: int
+    is_weekend: bool
+    daily_summary: Optional[DailySummary] = None
+    hourly_distribution: List[HourlyDistribution] = field(default_factory=list)
 
-    day_name: str = Field(
-        ..., description="Day name (e.g., 'Monday', 'Tuesday', ..., 'Sunday')."
-    )
-    day_of_week: int = Field(
-        ..., ge=1, le=7, description="ISO day of week (1=Monday ... 7=Sunday)."
-    )
-    is_weekend: bool = Field(..., description="True for Saturday and Sunday.")
-    daily_summary: Optional[DailySummary] = Field(
-        None, description="Aggregated full-day summary."
-    )
-    hourly_distribution: List[HourlyDistribution] = Field(
-        default_factory=list, description="Hourly distribution slots (0 to 23)."
-    )
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "day_name": self.day_name,
+            "day_of_week": self.day_of_week,
+            "is_weekend": self.is_weekend,
+            "daily_summary": self.daily_summary.to_dict()
+            if self.daily_summary is not None
+            else None,
+            "hourly_distribution": [h.to_dict() for h in self.hourly_distribution],
+        }
 
 
-class DatamartMetadata(BaseModel):
+@dataclass(slots=True)
+class DatamartMetadata:
     """Metadata regarding dataset generation, versioning, and time window."""
 
-    model_config = ConfigDict(extra="forbid")
+    generated_at: str
+    version: str = "1.0.0"
+    timezone: str = "Asia/Singapore (UTC+8)"
+    lookback_window_days: int = 60
+    total_observations_analyzed: Optional[int] = None
 
-    version: str = Field(default="1.0.0", description="Schema version.")
-    generated_at: str = Field(
-        ..., description="ISO 8601 timestamp with timezone when generated."
-    )
-    timezone: str = Field(
-        default="Asia/Singapore (UTC+8)",
-        description="Timezone used for day/hour binning.",
-    )
-    lookback_window_days: int = Field(
-        default=60, description="Number of historical days aggregated."
-    )
-    total_observations_analyzed: Optional[int] = Field(
-        None, description="Total observation count across all days."
-    )
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "version": self.version,
+            "generated_at": self.generated_at,
+            "timezone": self.timezone,
+            "lookback_window_days": self.lookback_window_days,
+            "total_observations_analyzed": self.total_observations_analyzed,
+        }
 
 
-class CarparkWeeklyDistributionDocument(BaseModel):
-    """Top-level JSON document representing a carpark's weekly availability and occupancy patterns."""
+@dataclass(slots=True)
+class CarparkWeeklyDistributionDocument:
+    """Top-level document representing a carpark's weekly availability and occupancy patterns."""
 
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
-    schema_url: Optional[str] = Field(
-        default="https://json-schema.org/draft/2020-12/schema",
-        alias="$schema",
-        description="JSON Schema URI.",
-    )
     metadata: DatamartMetadata
     carpark: CarparkMetadata
-    weekly_distribution: Dict[str, DayDistribution] = Field(
-        ...,
-        description="Distribution keyed by day of week ('1' for Monday to '7' for Sunday).",
-    )
+    weekly_distribution: Dict[int, DayDistribution]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "metadata": self.metadata.to_dict(),
+            "carpark": self.carpark.to_dict(),
+            "weekly_distribution": {
+                k: v.to_dict() for k, v in self.weekly_distribution.items()
+            },
+        }
