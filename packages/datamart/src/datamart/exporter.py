@@ -89,9 +89,7 @@ def _build_carpark_metadata(
         total_lots = None
 
     has_capacity = bool(
-        sample_row.get(
-            "has_capacity_data", total_lots is not None and total_lots > 0
-        )
+        sample_row.get("has_capacity_data", total_lots is not None and total_lots > 0)
     )
 
     lat = sample_row.get("location_latitude")
