@@ -23,7 +23,7 @@ def test_bronze_lambdas_publish_async_results_to_default_bus():
 def test_existing_notifier_targets_bronze_lambda_result_events():
     notifier = read_infra("infra/notifications/main.tf")
 
-    assert "aws_cloudwatch_event_rule\" \"bronze_lambda_result_rule" in notifier
+    assert 'aws_cloudwatch_event_rule" "bronze_lambda_result_rule' in notifier
     assert 'source = ["lambda"]' in notifier
     assert '"Lambda Function Invocation Result - Success"' in notifier
     assert '"Lambda Function Invocation Result - Failure"' in notifier
@@ -38,7 +38,7 @@ def test_default_event_bus_logs_all_events_to_cloudwatch():
     assert 'resource "aws_cloudwatch_event_rule" "default_bus_log"' in notifier
     assert 'prefix = ""' in notifier
     assert 'resource "aws_cloudwatch_event_target" "default_bus_log"' in notifier
-    assert "target_id = \"log-all-events\"" in notifier
+    assert 'target_id = "log-all-events"' in notifier
     assert "arn       = aws_cloudwatch_log_group.default_bus_log.arn" in notifier
 
 

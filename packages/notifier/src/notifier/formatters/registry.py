@@ -31,7 +31,9 @@ def register_formatter(*args: Any) -> Any:
         fn = args[-1]
         for source in sources:
             _FORMATTER_REGISTRY[str(source)] = fn
-            logger.debug("Registered formatter '%s' for source '%s'", fn.__name__, source)
+            logger.debug(
+                "Registered formatter '%s' for source '%s'", fn.__name__, source
+            )
         return fn
 
     # If called as a decorator with no arguments (single callable): @register_formatter
@@ -46,7 +48,9 @@ def register_formatter(*args: Any) -> Any:
     def decorator(fn: FormatterFunc) -> FormatterFunc:
         for source in sources:
             _FORMATTER_REGISTRY[str(source)] = fn
-            logger.debug("Registered formatter '%s' for source '%s'", fn.__name__, source)
+            logger.debug(
+                "Registered formatter '%s' for source '%s'", fn.__name__, source
+            )
         return fn
 
     return decorator

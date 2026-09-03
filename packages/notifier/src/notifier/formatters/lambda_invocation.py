@@ -55,11 +55,13 @@ def format_lambda_invocation_event(event: dict[str, Any], region: str) -> str:
 
     response_payload = detail.get("responsePayload")
     if not is_success and response_payload is not None:
-        lines.extend([
-            "",
-            "<b>Error:</b>",
-            f"<pre>{escape_html(truncate_text(_format_payload(response_payload)))}</pre>",
-        ])
+        lines.extend(
+            [
+                "",
+                "<b>Error:</b>",
+                f"<pre>{escape_html(truncate_text(_format_payload(response_payload)))}</pre>",
+            ]
+        )
 
     if function_name != "Unknown":
         console_url = (

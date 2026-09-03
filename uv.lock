@@ -592,12 +592,14 @@ source = { editable = "packages/gold" }
 dependencies = [
     { name = "dbt-athena-community" },
     { name = "dbt-core" },
+    { name = "pydantic" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "dbt-athena-community", specifier = ">=1.11.0" },
     { name = "dbt-core", specifier = ">=1.12.2" },
+    { name = "pydantic", specifier = ">=2.10.0" },
 ]
 
 [[package]]

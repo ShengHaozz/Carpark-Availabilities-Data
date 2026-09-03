@@ -152,8 +152,8 @@ def format_step_functions_event(event: dict[str, Any], region: str) -> str:
         failed_state, error_code, error_cause = (None, None, None)
 
         if execution_arn:
-            failed_state, error_code, error_cause = extract_failure_details_from_history(
-                sfn_client, execution_arn
+            failed_state, error_code, error_cause = (
+                extract_failure_details_from_history(sfn_client, execution_arn)
             )
 
         if not error_code and detail.get("error"):
@@ -162,7 +162,9 @@ def format_step_functions_event(event: dict[str, Any], region: str) -> str:
             error_cause = detail.get("cause")
 
         if failed_state:
-            lines.append(f"<b>Failed Step:</b> <code>{escape_html(failed_state)}</code>")
+            lines.append(
+                f"<b>Failed Step:</b> <code>{escape_html(failed_state)}</code>"
+            )
 
         if error_code:
             lines.append(f"<b>Error Type:</b> <code>{escape_html(error_code)}</code>")
@@ -176,11 +178,13 @@ def format_step_functions_event(event: dict[str, Any], region: str) -> str:
             except Exception:
                 pass
 
-            lines.extend([
-                "",
-                "<b>Error Cause:</b>",
-                f"<pre>{escape_html(truncate_text(cause_clean))}</pre>",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "<b>Error Cause:</b>",
+                    f"<pre>{escape_html(truncate_text(cause_clean))}</pre>",
+                ]
+            )
 
     # If succeeded and output is provided
     elif status == "SUCCEEDED" and detail.get("output"):
@@ -191,17 +195,21 @@ def format_step_functions_event(event: dict[str, Any], region: str) -> str:
         except Exception:
             pass
 
-        lines.extend([
-            "",
-            "<b>Output:</b>",
-            f"<pre>{escape_html(truncate_text(output_str))}</pre>",
-        ])
+        lines.extend(
+            [
+                "",
+                "<b>Output:</b>",
+                f"<pre>{escape_html(truncate_text(output_str))}</pre>",
+            ]
+        )
 
     if execution_arn:
         console_url = build_console_url(execution_arn, region)
-        lines.extend([
-            "",
-            f'<a href="{console_url}">Open in AWS Console</a>',
-        ])
+        lines.extend(
+            [
+                "",
+                f'<a href="{console_url}">Open in AWS Console</a>',
+            ]
+        )
 
     return "\n".join(lines)

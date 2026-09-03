@@ -22,6 +22,10 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "target"
   - "dbt_packages"
 
+vars:
+  # Normal runs include today and this many preceding Silver partitions.
+  silver_lookback_days: 7
+
 
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
