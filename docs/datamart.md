@@ -66,7 +66,6 @@ CloudFront distribution maps `/` directly to `/level=mart/target=downstream/vers
 | :--- | :--- | :--- |
 | `manifest.json` | `https://<cdn-domain>/manifest.json` | Root index listing metadata, generation timestamp, and total carparks. |
 | `carparks/{id}_{lot_type}.json` | `https://<cdn-domain>/carparks/ACB_C.json` | Individual carpark profile containing full 7-day $\times$ 24-hour distribution stats. |
-| `summary/weekly_carpark_distributions.json.gz` | `https://<cdn-domain>/summary/weekly_carpark_distributions.json.gz` | Consolidated GZIP bundle of all carparks for bulk client preload. |
 
 ---
 

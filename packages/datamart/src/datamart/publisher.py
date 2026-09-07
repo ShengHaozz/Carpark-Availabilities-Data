@@ -120,6 +120,7 @@ BOOL_COLUMNS = {
 # Hive TEXTFILE does not CSV-quote values, so commas in carpark metadata would
 # otherwise shift columns. This must match the dbt `field_delimiter` setting.
 MART_FIELD_DELIMITER = "\x01"
+CARPARK_INITIALS = tuple("ABCDEFGHIJKLMNOPQRSTUVWXYZ") + ("OTHER",)
 
 
 def parse_csv_row(row_dict: Dict[str, Any]) -> Dict[str, Any]:
@@ -233,60 +234,38 @@ def publish_datamart_to_s3(
     logger.info(
         f"Starting datamart publication for s3://{s3_bucket}/{input_prefix} -> {output_prefix} (version={version})..."
     )
-    rows = read_mart_csv_from_s3(
-        s3_bucket=s3_bucket,
-        prefix=input_prefix,
-        s3_client=client_s3,
-    )
-
-    if not rows:
-        logger.warning(
-            f"No rows found in S3 mart prefix '{input_prefix}'. Aborting export."
-        )
-        return {
-            "status": "SKIPPED",
-            "reason": "Empty dataset",
-            "carparks_exported": 0,
-        }
-
     now_iso = datetime.now(timezone.utc).isoformat()
-    documents = build_carpark_documents(rows, generated_at=now_iso)
-    total_carparks = len(documents)
-    logger.info(f"Transformed {total_carparks} distinct carpark documents.")
-
     prefix = f"{output_prefix}/version={version}"
     uploaded_count = 0
+    manifest_carparks: List[Dict[str, Any]] = []
 
-    # 1. Parallel upload of individual carpark JSON documents
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {}
-        for doc in documents:
-            key_id = f"{doc.carpark.carpark_id}_{doc.carpark.lot_type}"
-            s3_key = f"{prefix}/carparks/{key_id}.json"
-            json_str = dump_carpark_document_json(doc)
-            future = executor.submit(
-                _upload_single_carpark_json,
-                client_s3,
-                s3_bucket,
-                s3_key,
-                json_str,
-            )
-            futures[future] = s3_key
+    for carpark_initial in CARPARK_INITIALS:
+        logger.info("Processing carpark_initial=%s", carpark_initial)
+        rows = read_mart_csv_from_s3(
+            s3_bucket=s3_bucket,
+            prefix=f"{input_prefix}/carpark_initial={carpark_initial}",
+            s3_client=client_s3,
+        )
+        if not rows:
+            continue
 
-        for future in as_completed(futures):
-            future.result()
-            uploaded_count += 1
+        documents = build_carpark_documents(rows, generated_at=now_iso)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(
+                    _upload_single_carpark_json,
+                    client_s3,
+                    s3_bucket,
+                    f"{prefix}/carparks/{doc.carpark.carpark_id}_{doc.carpark.lot_type}.json",
+                    dump_carpark_document_json(doc),
+                ): doc
+                for doc in documents
+            }
+            for future in as_completed(futures):
+                future.result()
+                uploaded_count += 1
 
-    # 2. Upload metadata manifest
-    manifest_key = f"{prefix}/manifest.json"
-    manifest_data = {
-        "version": version,
-        "generated_at": now_iso,
-        "total_carparks": total_carparks,
-        "endpoints": {
-            "carpark_template": f"/{prefix}/carparks/{{carpark_id}}_{{lot_type}}.json",
-        },
-        "carparks": [
+        manifest_carparks.extend(
             {
                 "carpark_id": doc.carpark.carpark_id,
                 "lot_type": doc.carpark.lot_type,
@@ -296,7 +275,27 @@ def publish_datamart_to_s3(
                 "file_path": f"carparks/{doc.carpark.carpark_id}_{doc.carpark.lot_type}.json",
             }
             for doc in documents
-        ],
+        )
+        logger.info(
+            "Published %d documents for carpark_initial=%s",
+            len(documents),
+            carpark_initial,
+        )
+
+    if not manifest_carparks:
+        logger.warning(f"No rows found in partitioned S3 mart prefix '{input_prefix}'.")
+        return {"status": "SKIPPED", "reason": "Empty dataset", "carparks_exported": 0}
+
+    # 2. Upload metadata manifest
+    manifest_key = f"{prefix}/manifest.json"
+    manifest_data = {
+        "version": version,
+        "generated_at": now_iso,
+        "total_carparks": uploaded_count,
+        "endpoints": {
+            "carpark_template": f"/{prefix}/carparks/{{carpark_id}}_{{lot_type}}.json",
+        },
+        "carparks": manifest_carparks,
     }
     client_s3.put_object(
         Bucket=s3_bucket,

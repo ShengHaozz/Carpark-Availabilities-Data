@@ -197,7 +197,7 @@ def test_read_mart_csv_from_s3_without_header():
 
 
 @patch("datamart.publisher.read_mart_csv_from_s3")
-def test_publish_datamart_to_s3(mock_read):
+def test_publish_datamart_to_s3(mock_read, caplog):
     """Verifies complete datamart S3 export workflow including manifest and bundle."""
     mock_read.return_value = [
         {
@@ -245,6 +245,7 @@ def test_publish_datamart_to_s3(mock_read):
     ]
 
     mock_s3 = MagicMock()
+    mock_read.side_effect = [mock_read.return_value] + [[]] * 26
 
     result = publish_datamart_to_s3(
         s3_bucket="test-bucket",
@@ -268,6 +269,9 @@ def test_publish_datamart_to_s3(mock_read):
     )
     assert not any("/summary/" in key for key in keys_uploaded)
     assert "level=mart/target=downstream/version=v1/manifest.json" in keys_uploaded
+    assert mock_read.call_count == 27
+    assert mock_read.call_args_list[0].kwargs["prefix"].endswith("carpark_initial=A")
+    assert "Published 1 documents for carpark_initial=A" in caplog.text
 
 
 @patch("datamart.handler.publish_datamart_to_s3")

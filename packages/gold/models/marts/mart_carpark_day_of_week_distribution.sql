@@ -152,7 +152,12 @@ final_joined as (
         end as has_capacity_data,
         d.location_latitude,
         d.location_longitude,
-        to_iso8601(current_timestamp at time zone 'Asia/Singapore') as generated_at
+        to_iso8601(current_timestamp at time zone 'Asia/Singapore') as generated_at,
+        case
+            when regexp_like(substr(h.carpark_id, 1, 1), '^[A-Za-z]$')
+                then upper(substr(h.carpark_id, 1, 1))
+            else 'OTHER'
+        end as carpark_initial
     from hourly_aggregations h
     left join carpark_meta d
         on h.carpark_id = d.carpark_id

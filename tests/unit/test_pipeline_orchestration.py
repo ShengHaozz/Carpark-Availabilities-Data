@@ -185,7 +185,10 @@ class TestDatamartInfraConfig:
         ).read_text(encoding="utf-8")
 
         assert '+field_delimiter: "\\u0001"' in project_text
+        assert "+partitioned_by: ['carpark_initial']" in project_text
         assert "field_delimiter=" not in mart_sql
+        assert "then upper(substr(h.carpark_id, 1, 1))" in mart_sql
+        assert "end as carpark_initial" in mart_sql
 
     def test_gold_mart_emits_generated_at_as_singapore_iso8601_string(self):
         """Hive output must retain the Singapore offset without a timestamp-with-zone column."""

@@ -66,7 +66,7 @@ flowchart TD
 
     subgraph Datamart ["Datamart & Edge Delivery (CloudFront CDN)"]
         Lambda_Datamart["Step 3: datamart_publisher Lambda\n(Python 3.12 Zip / Native Dataclasses)"]
-        S3_Datamart[("S3: level=mart/target=downstream/version=v1/\n• carparks/{id}_{lot_type}.json\n• summary/weekly_carpark_distributions.json.gz\n• manifest.json")]
+        S3_Datamart[("S3: level=mart/target=downstream/version=v1/\n• carparks/{id}_{lot_type}.json\n• manifest.json")]
         CloudFront["Amazon CloudFront CDN\n(Origin Access Control & CORS for Vercel)"]
         ClientApp["Frontend / Vercel Web Client"]
 
