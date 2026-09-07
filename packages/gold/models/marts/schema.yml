@@ -1,0 +1,74 @@
+version: 2
+
+models:
+  - name: mart_carpark_day_of_week_distribution
+    description: "Analytical datamart aggregating 60-day historical observations into statistical distributions (percentiles, mean, stddev, fullness probability) for lots available and occupancy rate binned by day of the week and hour of day in Singapore Time (SGT)."
+    columns:
+      - name: distribution_id
+        description: "Deterministic surrogate key: md5(carpark_id | lot_type | day_of_week | hour_of_day_sgt)."
+        data_tests:
+          - unique
+          - not_null
+      - name: carpark_id
+        description: "Natural carpark identifier."
+        data_tests:
+          - not_null
+      - name: lot_type
+        description: "Vehicle category code (C, H, Y, S, unknown)."
+        data_tests:
+          - not_null
+      - name: day_of_week
+        description: "ISO day of week in Singapore Local Time (1 = Monday ... 7 = Sunday)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6, 7]
+                quote: false
+      - name: day_name
+        description: "Day name (Monday, Tuesday, etc.)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+      - name: is_weekend
+        description: "Boolean indicating Saturday or Sunday."
+        data_tests:
+          - not_null
+      - name: hour_of_day_sgt
+        description: "Hour of the day in Singapore Local Time (0 to 23)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+                quote: false
+      - name: observation_count
+        description: "Total number of 10-minute snapshot observations in this time slot over the lookback window."
+        data_tests:
+          - not_null
+      - name: lots_avail_median
+        description: "50th percentile (median) available lots."
+        data_tests:
+          - not_null
+      - name: lots_avail_min
+        description: "Minimum observed available lots."
+        data_tests:
+          - not_null
+      - name: lots_avail_max
+        description: "Maximum observed available lots."
+        data_tests:
+          - not_null
+      - name: probability_full
+        description: "Observed probability of 0 available lots (0.0 to 1.0)."
+        data_tests:
+          - not_null
+      - name: has_capacity_data
+        description: "Flag indicating whether total_lots and occupancy rate metrics are available (true for HDB, false for non-HDB/LTA)."
+        data_tests:
+          - not_null
+      - name: generated_at
+        description: "ISO 8601 timestamp with the Singapore (+08:00) offset when this mart aggregation table was generated."
+        data_tests:
+          - not_null

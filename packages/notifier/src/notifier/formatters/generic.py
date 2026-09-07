@@ -29,10 +29,12 @@ def format_generic_event(event: dict[str, Any], region: str) -> str:
     except Exception:
         formatted_json = str(detail)
 
-    lines.extend([
-        "",
-        "<b>Payload:</b>",
-        f"<pre>{escape_html(truncate_text(formatted_json))}</pre>",
-    ])
+    lines.extend(
+        [
+            "",
+            "<b>Payload:</b>",
+            f"<pre>{escape_html(truncate_text(formatted_json))}</pre>",
+        ]
+    )
 
     return "\n".join(lines)

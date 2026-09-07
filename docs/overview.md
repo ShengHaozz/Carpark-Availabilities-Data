@@ -51,13 +51,30 @@ flowchart TD
         Snapshots["snp_carpark\n(SCD Type 2 Snapshot)"]
         DimCarpark["dim_carpark\n(SCD2 Dimension)"]
         FctAvailability["fct_lot_availability\n(Daily Partitioned Fact)"]
-        S3_Gold[("S3: gold/\nIceberg Tables")]
+        MartDistribution["mart_carpark_day_of_week_distribution\n(Distribution Analytical CSV Mart)"]
+        S3_Gold[("S3: level=gold/\nIceberg Tables")]
+        S3_MartCSV[("S3: level=mart/target=publisher/\nCSV Mart")]
 
         Lambda_Silver -->|Task 2 on Success| Lambda_Gold
         Lambda_Gold --> Athena
         Athena --> Snapshots --> DimCarpark
         Athena --> FctAvailability
+        Athena --> MartDistribution
         DimCarpark & FctAvailability --> S3_Gold
+        MartDistribution --> S3_MartCSV
+    end
+
+    subgraph Datamart ["Datamart & Edge Delivery (CloudFront CDN)"]
+        Lambda_Datamart["Step 3: datamart_publisher Lambda\n(Python 3.12 Zip / Native Dataclasses)"]
+        S3_Datamart[("S3: level=mart/target=downstream/version=v1/\n• carparks/{id}_{lot_type}.json\n• manifest.json")]
+        CloudFront["Amazon CloudFront CDN\n(Origin Access Control & CORS for Vercel)"]
+        ClientApp["Frontend / Vercel Web Client"]
+
+        Lambda_Gold -->|Task 3 on Success| Lambda_Datamart
+        S3_MartCSV --> Lambda_Datamart
+        Lambda_Datamart --> S3_Datamart
+        S3_Datamart -.->|Private SigV4 (OAC)| CloudFront
+        CloudFront -->|HTTPS GET / Sub-20ms Cached| ClientApp
     end
 ```
 
@@ -75,17 +92,21 @@ The project is structured as a Python monorepo using [`uv` workspaces](https://d
 │   ├── overview.md              # System overview & developer guide
 │   ├── bronze.md                # Bronze ingestion layer details
 │   ├── silver.md                # Silver transformation & validation details
-│   └── gold.md                  # Gold dbt & dimensional modeling details
+│   ├── gold.md                  # Gold dbt & dimensional modeling details
+│   └── datamart.md              # Datamart JSON contracts & CloudFront CDN details
 ├── infra/                       # Terraform infrastructure definitions
 │   ├── bootstrap/               # IAM roles (bootstrap, ecr-builder, app-builder)
 │   ├── ecr/                     # AWS ECR repository management
-│   └── app/                     # S3, Lambda, EventBridge, Step Functions, Glue
+│   ├── notifications/           # Telegram failure notification Lambda & EventBridge rule
+│   └── app/                     # S3, Lambda, EventBridge, Step Functions, Glue, CloudFront
 └── packages/                    # Python and dbt sub-packages
     ├── lta_poller/              # Lambda: Ingest LTA DataMall availability data
     ├── hdb_poller/              # Lambda: Ingest Data.gov.sg HDB availability data
     ├── silver_cold/             # Lambda: Batch process raw Bronze into Silver Parquet (Docker ARM64)
     ├── silver_hot/              # Lambda: Near real-time processing (future)
-    └── gold/                    # Lambda + dbt: Automated dbt snapshot/run/test on Athena & Iceberg (Docker ARM64)
+    ├── gold/                    # Lambda + dbt: Automated dbt snapshot/run/test on Athena & Iceberg (Docker ARM64)
+    ├── datamart/                # Lambda: Edge JSON Datamart exporter & S3 publisher (Pure stdlib)
+    └── notifier/                # Lambda: Pipeline alerting & error notifications
 ```
 
 ---
@@ -209,4 +230,5 @@ make deploy
 
 * **[Bronze Layer Guide](bronze.md)**: Poller Lambdas, external APIs, pagination, rate limiting, and S3 raw JSON storage.
 * **[Silver Layer Guide](silver.md)**: Daily batch transformation, Pydantic schema validation, PyArrow Parquet writer, and Glue external table with partition projection.
-* **[Gold Layer Guide](gold.md)**: Containerized dbt runner, Step Functions daily pipeline orchestration, Athena / Iceberg models, SCD Type 2 snapshots, fact tables, and data quality tests.
+* **[Gold Layer Guide](gold.md)**: Containerized dbt runner, Step Functions daily pipeline orchestration, Athena / Iceberg models, SCD Type 2 snapshots, fact tables, analytical marts, and data quality tests.
+* **[Datamart Layer Guide](datamart.md)**: Pre-computed weekly distribution JSON contracts, CloudFront CDN edge delivery, S3 Origin Access Control (OAC), and Vercel CORS configuration.

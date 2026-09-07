@@ -18,13 +18,13 @@ flowchart TD
     
     subgraph Lambda Execution ["Lambda Container (/tmp/dbt)"]
         Setup["Copy dbt project to /tmp/dbt"] --> DbtSnap["dbtRunner: snapshot\n(snp_carpark on last 7 days)"]
-        DbtSnap --> DbtRun["dbtRunner: run\n(stg_silver -> dim_carpark -> fct_lot_availability)"]
+        DbtSnap --> DbtRun["dbtRunner: run\n(stg_silver -> dim_carpark -> fct_lot_availability -> mart_distribution)"]
         DbtRun --> DbtTest["dbtRunner: test\n(Schema tests & custom SQL assertions)"]
     end
 
     LambdaGold --> Setup
     DbtSnap & DbtRun & DbtTest --> Athena["Amazon Athena & Glue Catalog"]
-    Athena --> S3Gold[("S3: gold/\nIceberg Tables")]
+    Athena --> S3Gold[("S3: level=gold/\nIceberg Tables")]
 ```
 
 ---
@@ -91,6 +91,19 @@ AWS Lambda file systems are read-only except for `/tmp`. The Gold Lambda handler
   * `occupancy_rate = round((total_lots - lots_available) / total_lots, 4)`
   * `is_full = (lots_available == 0)`
 
+### 3.5 Analytical Mart: `mart_carpark_day_of_week_distribution`
+* **File**: [`models/marts/mart_carpark_day_of_week_distribution.sql`](file:///c:/Users/sheng/OneDrive/Documents/Carpark-Availabilities-Data/packages/gold/models/marts/mart_carpark_day_of_week_distribution.sql)
+* **Materialization**: `table` (Hive Textfile / CSV table stored at `s3://<bucket>/level=mart/target=publisher/`, schema `marts`)
+* **Primary Key**: `distribution_id = to_hex(md5(to_utf8(concat(carpark_id, '|', lot_type, '|', cast(day_of_week as varchar), '|', cast(hour_of_day_sgt as varchar)))))`
+* **Lookback Window**: Scans the last 60 days of fact observations (`snapshot_timestamp >= date_add('day', -60, current_timestamp)`).
+* **Granularity**: 1-hour time window per day-of-week (`1=Monday` to `7=Sunday`) per `(carpark_id, lot_type)`.
+* **Aggregated Statistical Metrics**:
+  * Available Lots: `lots_avail_min`, `lots_avail_p10`, `lots_avail_p25`, `lots_avail_median`, `lots_avail_p75`, `lots_avail_p90`, `lots_avail_max`, `lots_avail_mean`, `lots_avail_stddev`
+  * Occupied Lots: `lots_occ_min`, `lots_occ_p10`, `lots_occ_p25`, `lots_occ_median`, `lots_occ_p75`, `lots_occ_p90`, `lots_occ_max`, `lots_occ_mean`, `lots_occ_stddev`
+  * Occupancy Rates: `occupancy_min`, `occupancy_p10`, `occupancy_p25`, `occupancy_median`, `occupancy_p75`, `occupancy_p90`, `occupancy_max`, `occupancy_mean`, `occupancy_stddev`
+  * Probabilities: `probability_full` ($\text{lots\_available} = 0$), `probability_high_occupancy` ($\text{occupancy\_rate} \ge 90\%$)
+  * Metadata joins: `development`, `area`, `agency`, `total_lots`, `has_capacity_data`, `location_latitude`, `location_longitude`
+
 ---
 
 ## 4. Data Quality & Assertion Tests
@@ -120,7 +133,7 @@ make dbt_debug
 # 3. Execute SCD Type 2 snapshot
 make dbt_snapshot
 
-# 4. Build staging views, dimensions, and facts
+# 4. Build staging views, dimensions, facts, and analytical marts
 make dbt_run
 
 # 5. Run full suite of generic schema tests and custom SQL assertions
@@ -131,7 +144,7 @@ make dbt_test
 
 ## 6. Manual Step Functions Execution
 
-To trigger the full daily pipeline (Silver $\rightarrow$ Gold) manually via AWS CLI:
+To trigger the full daily pipeline (Silver $\rightarrow$ Gold $\rightarrow$ Datamart) manually via AWS CLI:
 
 ```bash
 # Get the state machine ARN from Terraform

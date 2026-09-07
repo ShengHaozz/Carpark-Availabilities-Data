@@ -23,7 +23,9 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
     formatter = get_formatter(event)
     source = event.get("source", "direct/custom")
 
-    logger.info("Formatting notification for source '%s' using %s", source, formatter.__name__)
+    logger.info(
+        "Formatting notification for source '%s' using %s", source, formatter.__name__
+    )
     message = formatter(event, aws_region)
 
     result = send_telegram_message(bot_token, chat_id, message)

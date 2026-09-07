@@ -12,8 +12,10 @@
 
 with staging as (
     select * from {{ ref('stg_silver__carpark_snapshots') }}
-    -- Prunes Athena partition scan to the rolling last 7 days (1 week)
+    {% if not flags.FULL_REFRESH %}
+    -- Prunes Athena partition scan to the rolling last 7 days (1 week) on incremental runs
     where snapshot_timestamp >= date_add('day', -7, current_timestamp)
+    {% endif %}
 ),
 
 latest_carpark_state as (

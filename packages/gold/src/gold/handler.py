@@ -8,18 +8,18 @@ import threading
 from typing import Any, Dict
 
 # Monkey-patch multiprocessing primitives to support AWS Lambda's stripped environment (no /dev/shm)
-multiprocessing.synchronize.RLock = lambda *args, **kwargs: threading.RLock()
-multiprocessing.synchronize.Lock = lambda *args, **kwargs: threading.Lock()
-multiprocessing.synchronize.Semaphore = lambda value=1, *args, **kwargs: (
+multiprocessing.synchronize.RLock = lambda *args, **kwargs: threading.RLock()  # type: ignore[misc,assignment]
+multiprocessing.synchronize.Lock = lambda *args, **kwargs: threading.Lock()  # type: ignore[misc,assignment]
+multiprocessing.synchronize.Semaphore = lambda value=1, *args, **kwargs: (  # type: ignore[misc,assignment]
     threading.Semaphore(value)
 )
-multiprocessing.synchronize.BoundedSemaphore = lambda value=1, *args, **kwargs: (
+multiprocessing.synchronize.BoundedSemaphore = lambda value=1, *args, **kwargs: (  # type: ignore[misc,assignment]
     threading.BoundedSemaphore(value)
 )
-multiprocessing.synchronize.Condition = lambda lock=None, *args, **kwargs: (
+multiprocessing.synchronize.Condition = lambda lock=None, *args, **kwargs: (  # type: ignore[misc,assignment]
     threading.Condition(lock)
 )
-multiprocessing.synchronize.Event = lambda *args, **kwargs: threading.Event()
+multiprocessing.synchronize.Event = lambda *args, **kwargs: threading.Event()  # type: ignore[misc,assignment]
 
 from dbt.cli.main import dbtRunner, dbtRunnerResult  # noqa: E402
 

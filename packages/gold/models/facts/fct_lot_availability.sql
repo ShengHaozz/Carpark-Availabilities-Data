@@ -9,13 +9,6 @@
 
 with staging_snapshots as (
     select * from {{ ref('stg_silver__carpark_snapshots') }}
-    {% if is_incremental() %}
-    -- 7-day lookback window to support automatic backfills, late-arriving data, and reruns
-    where snapshot_timestamp >= (
-        select coalesce(date_add('day', -7, max(snapshot_timestamp)), timestamp '1970-01-01 00:00:00') 
-        from {{ this }}
-    )
-    {% endif %}
 ),
 
 dim_carparks as (
@@ -35,11 +28,13 @@ joined as (
         case 
             when d.total_lots is not null and d.total_lots >= s.lots_available 
             then d.total_lots - s.lots_available
+            when d.total_lots is not null and s.lots_available > d.total_lots
+            then 0
             else null 
         end as lots_occupied,
         case 
             when d.total_lots is not null and d.total_lots > 0 
-            then round(cast(d.total_lots - s.lots_available as double) / cast(d.total_lots as double), 4)
+            then greatest(0.0, least(1.0, round(cast(d.total_lots - s.lots_available as double) / cast(d.total_lots as double), 4)))
             else null 
         end as occupancy_rate,
         case 
@@ -56,4 +51,3 @@ joined as (
 )
 
 select * from joined
-

@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "carpark-availabilities-data",
+    "datamart",
     "gold",
     "hdb-poller",
     "lta-poller",
@@ -411,6 +412,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/e1/d0/c0a1374db3afad0f9
 wheels = [
     { url = "https://files.pythonhosted.org/packages/29/fe/d54a874e8d7b88bc03c459f63a993305db50039b734fab751a0466dabfc1/daff-1.4.2-py3-none-any.whl", hash = "sha256:88981a21d065e4378b5c4bd40b975dbfdea9b7ff540071f3bb5e20cc8b3590b5", size = 144922, upload-time = "2025-05-04T19:24:09.999Z" },
 ]
+
+[[package]]
+name = "datamart"
+version = "0.1.0"
+source = { editable = "packages/datamart" }
+dependencies = [
+    { name = "boto3" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "boto3", specifier = ">=1.43.75" }]
 
 [[package]]
 name = "dbt-adapters"

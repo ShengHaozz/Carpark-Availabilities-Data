@@ -1,6 +1,6 @@
-import re
 import json
 from pathlib import Path
+import re
 import pytest
 
 
@@ -64,6 +64,18 @@ class TestStepFunctionsOrchestration:
         start_state = state_machine_def["StartAt"]
         assert start_state in state_machine_def["States"]
 
+    def test_pipeline_task_chain(self, state_machine_def):
+        """Validates the complete 3-step pipeline: TransformSilver -> RunGoldDbt -> PublishDatamart -> Succeeded."""
+        states = state_machine_def["States"]
+        assert "TransformSilver" in states
+        assert "RunGoldDbt" in states
+        assert "PublishDatamart" in states
+        assert "PipelineSucceeded" in states
+
+        assert states["TransformSilver"]["Next"] == "RunGoldDbt"
+        assert states["RunGoldDbt"]["Next"] == "PublishDatamart"
+        assert states["PublishDatamart"]["Next"] == "PipelineSucceeded"
+
     def test_states_do_not_wipe_out_payload_for_downstream_tasks(
         self, state_machine_def
     ):
@@ -107,3 +119,89 @@ class TestStepFunctionsOrchestration:
                 assert catch_target in states, (
                     f"State '{state_name}' has invalid Catch target: '{catch_target}'"
                 )
+
+
+class TestDatamartInfraConfig:
+    def test_datamart_lambda_infra_exists(self):
+        """Ensures infra/app/datamart_lambda/ files exist and define dedicated publisher resources."""
+        base_dir = (
+            Path(__file__).resolve().parent.parent.parent
+            / "infra"
+            / "app"
+            / "datamart_lambda"
+        )
+        assert (base_dir / "datamart_lambda.tf").exists()
+        assert (base_dir / "variables.tf").exists()
+        assert (base_dir / "outputs.tf").exists()
+
+        tf_text = (base_dir / "datamart_lambda.tf").read_text(encoding="utf-8")
+        assert "aws_iam_role" in tf_text
+        assert "lambda_role_datamart_publisher" in tf_text
+        assert "level=mart/target=downstream/*" in tf_text
+        assert "datamart_publisher_lambda" in tf_text
+
+    def test_gold_dbt_scoped_to_target_publisher_permissions(self):
+        """Ensures gold_lambda is scoped strictly to target=publisher and decoupled from downstream datamart."""
+        gold_tf = (
+            Path(__file__).resolve().parent.parent.parent
+            / "infra"
+            / "app"
+            / "gold_lambda"
+            / "gold_dbt.tf"
+        )
+        tf_text = gold_tf.read_text(encoding="utf-8")
+        assert "level=mart/target=publisher/*" in tf_text
+        assert "level=mart/target=downstream/*" not in tf_text
+
+    def test_gold_mart_writes_to_a_fixed_publisher_folder(self):
+        """The publisher must read the one deterministic folder dbt replaces each run."""
+        root_dir = Path(__file__).resolve().parent.parent.parent
+        project_text = (root_dir / "packages" / "gold" / "dbt_project.yml").read_text(
+            encoding="utf-8"
+        )
+        datamart_tf = (
+            root_dir / "infra" / "app" / "datamart_lambda" / "datamart_lambda.tf"
+        ).read_text(encoding="utf-8")
+
+        assert "+s3_data_naming: table" in project_text
+        assert (
+            'INPUT_PREFIX     = "level=mart/target=publisher/mart_carpark_day_of_week_distribution"'
+            in datamart_tf
+        )
+
+    def test_gold_mart_uses_a_delimiter_safe_for_metadata_commas(self):
+        """Hive TEXTFILE must not use commas because metadata values contain them."""
+        root_dir = Path(__file__).resolve().parent.parent.parent
+        project_text = (root_dir / "packages" / "gold" / "dbt_project.yml").read_text(
+            encoding="utf-8"
+        )
+        mart_sql = (
+            root_dir
+            / "packages"
+            / "gold"
+            / "models"
+            / "marts"
+            / "mart_carpark_day_of_week_distribution.sql"
+        ).read_text(encoding="utf-8")
+
+        assert '+field_delimiter: "\\u0001"' in project_text
+        assert "+partitioned_by: ['carpark_initial']" in project_text
+        assert "field_delimiter=" not in mart_sql
+        assert "then upper(substr(h.carpark_id, 1, 1))" in mart_sql
+        assert "end as carpark_initial" in mart_sql
+
+    def test_gold_mart_emits_generated_at_as_singapore_iso8601_string(self):
+        """Hive output must retain the Singapore offset without a timestamp-with-zone column."""
+        mart_sql = (
+            Path(__file__).resolve().parent.parent.parent
+            / "packages"
+            / "gold"
+            / "models"
+            / "marts"
+            / "mart_carpark_day_of_week_distribution.sql"
+        ).read_text(encoding="utf-8")
+
+        assert (
+            "to_iso8601(current_timestamp at time zone 'Asia/Singapore') as generated_at"
+            in mart_sql
+        )

@@ -80,7 +80,9 @@ def test_extract_failure_details_from_history():
                 "type": "ExecutionFailed",
                 "executionFailedEventDetails": {
                     "error": "CustomPipelineError",
-                    "cause": json.dumps({"errorMessage": "Silver cold transformation failed"}),
+                    "cause": json.dumps(
+                        {"errorMessage": "Silver cold transformation failed"}
+                    ),
                 },
             },
             {
@@ -99,7 +101,9 @@ def test_extract_failure_details_from_history():
         ]
     }
 
-    state, error, cause = extract_failure_details_from_history(mock_sfn, "arn:aws:states:exec-1")
+    state, error, cause = extract_failure_details_from_history(
+        mock_sfn, "arn:aws:states:exec-1"
+    )
     assert state == "TransformSilver"
     assert error == "CustomPipelineError"
     assert "Silver cold transformation failed" in (cause or "")
@@ -109,7 +113,9 @@ def test_extract_failure_details_with_exception():
     mock_sfn = MagicMock()
     mock_sfn.get_execution_history.side_effect = Exception("Access Denied")
 
-    state, error, cause = extract_failure_details_from_history(mock_sfn, "arn:aws:states:exec-1")
+    state, error, cause = extract_failure_details_from_history(
+        mock_sfn, "arn:aws:states:exec-1"
+    )
     assert state is None
     assert error is None
     assert cause is None
@@ -129,12 +135,16 @@ def test_format_timestamp():
 
 
 def test_build_console_url():
-    url = build_console_url("arn:aws:states:ap-southeast-1:123:execution:sm:e1", "ap-southeast-1")
+    url = build_console_url(
+        "arn:aws:states:ap-southeast-1:123:execution:sm:e1", "ap-southeast-1"
+    )
     assert "ap-southeast-1.console.aws.amazon.com" in url
     assert "arn:aws:states:ap-southeast-1:123:execution:sm:e1" in url
 
 
-@patch("packages.notifier.src.notifier.formatters.step_functions.get_stepfunctions_client")
+@patch(
+    "packages.notifier.src.notifier.formatters.step_functions.get_stepfunctions_client"
+)
 def test_format_step_functions_event(mock_get_sfn, sample_sfn_failed_event):
     mock_sfn = MagicMock()
     mock_sfn.get_execution_history.return_value = {
@@ -310,7 +320,10 @@ def test_register_custom_formatter():
         return "Glue Custom Alert"
 
     register_formatter("aws.glue", custom_glue_formatter)
-    assert get_formatter({"source": "aws.glue"})({"source": "aws.glue"}, "ap-southeast-1") == "Glue Custom Alert"
+    assert (
+        get_formatter({"source": "aws.glue"})({"source": "aws.glue"}, "ap-southeast-1")
+        == "Glue Custom Alert"
+    )
 
 
 # --- Telegram Dispatcher & Truncation Tests ---
@@ -352,9 +365,13 @@ def test_send_telegram_message_http_error(mock_urlopen):
 # --- End-to-End Handler Tests ---
 
 
-@patch("packages.notifier.src.notifier.formatters.step_functions.get_stepfunctions_client")
+@patch(
+    "packages.notifier.src.notifier.formatters.step_functions.get_stepfunctions_client"
+)
 @patch("packages.notifier.src.notifier.handler.send_telegram_message")
-def test_handler_step_functions_event(mock_send, mock_get_sfn, mock_env, sample_sfn_failed_event):
+def test_handler_step_functions_event(
+    mock_send, mock_get_sfn, mock_env, sample_sfn_failed_event
+):
     mock_sfn = MagicMock()
     mock_sfn.get_execution_history.return_value = {"events": []}
     mock_get_sfn.return_value = mock_sfn

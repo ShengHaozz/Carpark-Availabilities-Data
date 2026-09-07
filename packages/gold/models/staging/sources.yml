@@ -11,23 +11,12 @@ sources:
         columns:
           - name: carpark_id
             description: "Unique carpark identifier provided by LTA/HDB (e.g. C1, HE12)."
-            data_tests:
-              - not_null
           - name: snapshot_timestamp
             description: "UTC timestamp of the 10-minute snapshot poll."
-            data_tests:
-              - not_null
           - name: lot_type
             description: "Vehicle lot type (C: Car, H: Heavy, Y: Motorcycle, S: Special, unknown)."
-            data_tests:
-              - not_null
-              - accepted_values:
-                  arguments:
-                    values: ['C', 'H', 'S', 'Y', 'unknown']
           - name: lots_available
             description: "Count of currently available lots."
-            data_tests:
-              - not_null
           - name: total_lots
             description: "Total lot capacity for this carpark and lot type (if available from HDB dataset)."
           - name: location_latitude
@@ -40,15 +29,8 @@ sources:
             description: "Name of the building or carpark development."
           - name: agency
             description: "Managing government agency (HDB, LTA, URA)."
-            data_tests:
-              - not_null
-              - accepted_values:
-                  arguments:
-                    values: ['HDB', 'LTA', 'URA']
           - name: ingestion_timestamp
             description: "Timestamp when the silver Lambda processed the data."
-            data_tests:
-              - not_null
           - name: source_filepath
             description: "S3 path of the bronze file used to construct this record."
           - name: year

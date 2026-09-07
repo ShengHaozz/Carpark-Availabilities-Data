@@ -1,6 +1,5 @@
 # Carpark-Availabilities-Data
-Data ingestion and ELT pipeline from LTA's DataMall API for Carpark Availabilities 
-
+Serverless Medallion ELT pipeline and edge data platform ingesting Singapore carpark availabilities from LTA DataMall and Data.gov.sg (HDB) APIs.
 
 ## Problem Statement
 When planning a trip via car, drivers want an estimate of which carparks are usually available at specific times. However, most applications that utilise LTA's DataMall API only show availabilities at the current time, rather than historical availabilities throughout the day and week.
@@ -22,4 +21,5 @@ Comprehensive developer and architecture guides are available in the [`docs/`](d
 - **[Architecture & Developer Overview](docs/overview.md)**: Monorepo layout, prerequisites, `.env` config, deployment lifecycle, and local development.
 - **[Bronze Layer Guide](docs/bronze.md)**: Raw API pollers (LTA & HDB), pagination, rate limiting, and S3 JSON storage.
 - **[Silver Layer Guide](docs/silver.md)**: Daily batch transformation, Pydantic data modeling, Parquet generation with ZSTD, and AWS Glue partition projection.
-- **[Gold Layer Guide](docs/gold.md)**: dbt-athena models, SCD Type 2 dimension tracking (`snp_carpark` / `dim_carpark`), partitioned fact tables (`fct_lot_availability`), and data quality tests.
+- **[Gold Layer Guide](docs/gold.md)**: dbt-athena models, SCD Type 2 dimension tracking (`snp_carpark` / `dim_carpark`), partitioned fact tables (`fct_lot_availability`), analytical distribution marts (`mart_carpark_day_of_week_distribution`), and data quality tests.
+- **[Datamart Layer Guide](docs/datamart.md)**: Pre-computed weekly distribution JSON models, CloudFront CDN edge delivery, S3 Origin Access Control (OAC), and Vercel CORS configuration.

@@ -13,15 +13,19 @@ flowchart TD
     subgraph Step Functions State Machine
         StartNode([Start]) --> TaskSilver["Step 1: Invoke silver_cold Lambda\n(Consolidates 144 Bronze JSON -> 1 Parquet)"]
         TaskSilver -->|Success| TaskGold["Step 2: Invoke gold_dbt Lambda\n(dbt snapshot -> dbt run -> dbt test)"]
-        TaskSilver -->|Error / Retries Exhausted| FailNode["Pipeline Failed\n(Fail State / CloudWatch Alert)"]
+        TaskGold -->|Success & Tests Pass| TaskDatamart["Step 3: Invoke datamart_publisher Lambda\n(Exports Mart to Edge JSON on S3)"]
+        TaskDatamart -->|Success| SuccessNode([Pipeline Succeeded])
         
-        TaskGold -->|Success & Tests Pass| SuccessNode([Pipeline Succeeded])
+        TaskSilver -->|Error / Retries Exhausted| FailNode["Pipeline Failed\n(Fail State / CloudWatch Alert)"]
         TaskGold -->|Failure / Test Violations| FailNode
+        TaskDatamart -->|Failure| FailNode
     end
     
     subgraph Compute & Data Layer
         TaskSilver --> S3Silver["S3: /level=silver/"]
-        TaskGold --> AthenaIceberg["Athena & Glue Catalog\n(gold.dim_carpark, gold.fct_lot_availability)"]
+        TaskGold --> AthenaIceberg["Athena & Glue Catalog\n(gold.dim_carpark, gold.fct_lot_availability,\nmarts.mart_carpark_day_of_week_distribution)"]
+        TaskGold --> S3MartCSV["S3: /level=mart/target=publisher/mart_carpark_day_of_week_distribution/\n(Daily CSV Mart)"]
+        TaskDatamart --> S3Datamart["S3: /level=mart/target=downstream/version=v1/\n(Edge JSON / CDN)"]
     end
     
     SFN --> StartNode
@@ -60,6 +64,14 @@ flowchart TD
   * `lots_occupied = total_lots - lots_available`
   * `occupancy_rate = round((total_lots - lots_available) / total_lots, 4)`
   * `is_full = (lots_available == 0)`
+
+### 2.5 Analytical Mart: `mart_carpark_day_of_week_distribution`
+* **File**: [`models/marts/mart_carpark_day_of_week_distribution.sql`](models/marts/mart_carpark_day_of_week_distribution.sql)
+* **Materialization**: `table` (Hive Textfile / CSV format stored at `s3://<bucket>/level=mart/target=publisher/mart_carpark_day_of_week_distribution/`; dbt replaces this fixed folder on each run; schema `marts`)
+* **Primary Key**: `distribution_id = to_hex(md5(to_utf8(concat(carpark_id, '|', lot_type, '|', cast(day_of_week as varchar), '|', cast(hour_of_day_sgt as varchar)))))`
+* **Lookback Window**: 60-day rolling observation window.
+* **Granularity**: 1-hour slot per day-of-week (`1=Monday` ... `7=Sunday`) per `(carpark_id, lot_type)`.
+* **Aggregations**: Full percentiles (P10, P25, Median, P75, P90, Min, Max, Mean, StdDev) for available lots, occupied lots, and occupancy rate, plus `probability_full` and `probability_high_occupancy`.
 
 ---
 

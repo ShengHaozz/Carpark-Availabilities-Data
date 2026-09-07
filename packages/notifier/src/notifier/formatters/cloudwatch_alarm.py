@@ -26,16 +26,20 @@ def format_cloudwatch_alarm_event(event: dict[str, Any], region: str) -> str:
         lines.append(f"<b>Time:</b> {escape_html(timestamp)}")
 
     if reason:
-        lines.extend([
-            "",
-            "<b>Reason:</b>",
-            f"<pre>{escape_html(truncate_text(reason))}</pre>",
-        ])
+        lines.extend(
+            [
+                "",
+                "<b>Reason:</b>",
+                f"<pre>{escape_html(truncate_text(reason))}</pre>",
+            ]
+        )
 
     console_url = f"https://{region}.console.aws.amazon.com/cloudwatch/home?region={region}#alarmsV2:alarm/{alarm_name}"
-    lines.extend([
-        "",
-        f'<a href="{console_url}">Open Alarm in AWS Console</a>',
-    ])
+    lines.extend(
+        [
+            "",
+            f'<a href="{console_url}">Open Alarm in AWS Console</a>',
+        ]
+    )
 
     return "\n".join(lines)

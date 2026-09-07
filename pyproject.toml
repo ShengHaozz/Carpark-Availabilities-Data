@@ -21,4 +21,12 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [
+    ".",
+    "packages/datamart/src",
+    "packages/gold/src",
+    "packages/bronze/src",
+    "packages/silver_cold/src",
+    "packages/silver_hot/src",
+    "packages/notifier/src",
+]

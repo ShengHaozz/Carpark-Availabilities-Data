@@ -22,6 +22,10 @@ clean-targets:         # directories to be removed by `dbt clean`
   - "target"
   - "dbt_packages"
 
+vars:
+  # Normal runs include today and this many preceding Silver partitions.
+  silver_lookback_days: 7
+
 
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
@@ -42,4 +46,12 @@ models:
       +materialized: incremental
       +table_type: iceberg
       +schema: gold
-
+    marts:
+      +materialized: table
+      +table_type: hive
+      +format: textfile
+      +field_delimiter: "\u0001"
+      +partitioned_by: ['carpark_initial']
+      +s3_data_dir: "s3://{{ env_var('S3_BUCKET') }}/level=mart/target=publisher/"
+      +s3_data_naming: table
+      +schema: marts

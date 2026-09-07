@@ -17,3 +17,8 @@ module "gold_lambda" {
   image_digest = var.image_digests["gold"]
   repo_url     = var.ecr_repo_url
 }
+
+module "datamart_lambda" {
+  source    = "./datamart_lambda"
+  s3_bucket = aws_s3_bucket.bucket
+}
