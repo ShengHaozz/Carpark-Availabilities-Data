@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timezone
-import gzip
 import json
 from typing import Any, Dict, List, Optional
 
@@ -363,22 +362,3 @@ def dump_carpark_document_json(
 ) -> str:
     """Serializes a CarparkWeeklyDistributionDocument to formatted JSON string."""
     return json.dumps(document.to_dict(), indent=indent)
-
-
-def create_summary_bundle_gzip(
-    documents: List[CarparkWeeklyDistributionDocument],
-    generated_at: Optional[str] = None,
-) -> bytes:
-    """Serializes and compresses all carpark documents into a GZIP JSON bundle."""
-    if generated_at is None:
-        generated_at = datetime.now(timezone.utc).isoformat()
-
-    payload = {
-        "metadata": {
-            "version": DATAMART_SCHEMA_VERSION,
-            "generated_at": generated_at,
-        },
-        "carparks": [doc.to_dict() for doc in documents],
-    }
-    raw_json = json.dumps(payload, separators=(",", ":")).encode("utf-8")
-    return gzip.compress(raw_json)

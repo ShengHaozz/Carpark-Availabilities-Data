@@ -3,7 +3,6 @@
 from datamart.exporter import (
     build_carpark_document,
     build_carpark_documents,
-    create_summary_bundle_gzip,
     dump_carpark_document_json,
 )
 from datamart.handler import handler
@@ -34,7 +33,6 @@ __all__ = [
     "PercentileStats",
     "build_carpark_document",
     "build_carpark_documents",
-    "create_summary_bundle_gzip",
     "dump_carpark_document_json",
     "publish_datamart_to_s3",
     "handler",

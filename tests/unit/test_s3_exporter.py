@@ -259,17 +259,14 @@ def test_publish_datamart_to_s3(mock_read):
     assert result["s3_prefix"] == "level=mart/target=downstream/version=v1"
 
     # Verify S3 upload calls
-    # Should upload: 1 carpark JSON + 1 gzip bundle + 1 manifest
-    assert mock_s3.put_object.call_count == 3
+    # Should upload: 1 carpark JSON + 1 manifest
+    assert mock_s3.put_object.call_count == 2
     keys_uploaded = [call[1]["Key"] for call in mock_s3.put_object.call_args_list]
 
     assert (
         "level=mart/target=downstream/version=v1/carparks/ACB_C.json" in keys_uploaded
     )
-    assert (
-        "level=mart/target=downstream/version=v1/summary/weekly_carpark_distributions.json.gz"
-        in keys_uploaded
-    )
+    assert not any("/summary/" in key for key in keys_uploaded)
     assert "level=mart/target=downstream/version=v1/manifest.json" in keys_uploaded
 
 

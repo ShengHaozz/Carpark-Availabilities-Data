@@ -1,13 +1,11 @@
 """Unit tests for Carpark JSON Datamart transformation and serialization."""
 
-import gzip
 import json
 from typing import Any, Dict, List
 
 from datamart.exporter import (
     build_carpark_document,
     build_carpark_documents,
-    create_summary_bundle_gzip,
     dump_carpark_document_json,
 )
 
@@ -222,29 +220,3 @@ def test_dump_carpark_document_json():
     assert "weekly_distribution" in parsed
     assert "1" in parsed["weekly_distribution"]
     assert parsed["$schema"] == "https://json-schema.org/draft/2020-12/schema"
-
-
-def test_create_summary_bundle_gzip():
-    """Verifies create_summary_bundle_gzip compresses all carpark documents."""
-    hdb_rows = _sample_hdb_mart_rows()
-    non_hdb_rows = _sample_non_hdb_mart_rows()
-
-    docs = build_carpark_documents(
-        hdb_rows + non_hdb_rows, generated_at="2026-09-02T00:15:00+08:00"
-    )
-
-    gz_bytes = create_summary_bundle_gzip(
-        docs, generated_at="2026-09-02T00:15:00+08:00"
-    )
-    assert len(gz_bytes) > 0
-
-    # Decompress and verify
-    decompressed = gzip.decompress(gz_bytes).decode("utf-8")
-    parsed_bundle = json.loads(decompressed)
-
-    assert parsed_bundle["metadata"]["version"] == "1.0.0"
-    assert parsed_bundle["metadata"]["generated_at"] == "2026-09-02T00:15:00+08:00"
-    assert len(parsed_bundle["carparks"]) == 2
-    carpark_ids = [c["carpark"]["carpark_id"] for c in parsed_bundle["carparks"]]
-    assert "ACB" in carpark_ids
-    assert "SUNTEC" in carpark_ids

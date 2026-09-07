@@ -15,7 +15,6 @@ import boto3
 
 from datamart.exporter import (
     build_carpark_documents,
-    create_summary_bundle_gzip,
     dump_carpark_document_json,
 )
 
@@ -278,22 +277,7 @@ def publish_datamart_to_s3(
             future.result()
             uploaded_count += 1
 
-    # 2. Upload consolidated GZIP bundle
-    bundle_key = f"{prefix}/summary/weekly_carpark_distributions.json.gz"
-    bundle_bytes = create_summary_bundle_gzip(documents, generated_at=now_iso)
-    client_s3.put_object(
-        Bucket=s3_bucket,
-        Key=bundle_key,
-        Body=bundle_bytes,
-        ContentType="application/json",
-        ContentEncoding="gzip",
-        CacheControl="public, max-age=86400",
-    )
-    logger.info(
-        f"Uploaded compressed summary bundle to s3://{s3_bucket}/{bundle_key} ({len(bundle_bytes)} bytes)."
-    )
-
-    # 3. Upload metadata manifest
+    # 2. Upload metadata manifest
     manifest_key = f"{prefix}/manifest.json"
     manifest_data = {
         "version": version,
@@ -301,7 +285,6 @@ def publish_datamart_to_s3(
         "total_carparks": total_carparks,
         "endpoints": {
             "carpark_template": f"/{prefix}/carparks/{{carpark_id}}_{{lot_type}}.json",
-            "summary_bundle_gz": f"/{prefix}/summary/weekly_carpark_distributions.json.gz",
         },
         "carparks": [
             {
@@ -328,6 +311,5 @@ def publish_datamart_to_s3(
         "status": "SUCCESS",
         "carparks_exported": uploaded_count,
         "s3_prefix": prefix,
-        "summary_bundle_bytes": len(bundle_bytes),
         "manifest_key": manifest_key,
     }

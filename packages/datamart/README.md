@@ -11,7 +11,7 @@ flowchart LR
     SFN["AWS Step Functions\n(carpark-daily-pipeline)"] -->|Task 3: PublishDatamart| Lambda["datamart_publisher Lambda\n(packages/datamart)"]
     Lambda -->|Read Mart CSV| S3CSV["S3: level=mart/target=publisher/mart_carpark_day_of_week_distribution/"]
     S3CSV -->|Stream & Type Cast| Exporter["Datamart Exporter\n(Pure stdlib dataclasses)"]
-    Exporter -->|Upload JSONs| S3Mart[("S3: level=mart/target=downstream/version=v1/\n• carparks/{id}_{lot_type}.json\n• summary/weekly_carpark_distributions.json.gz\n• manifest.json")]
+    Exporter -->|Upload JSONs| S3Mart[("S3: level=mart/target=downstream/version=v1/\n• carparks/{id}_{lot_type}.json\n• manifest.json")]
     S3Mart -.->|Private SigV4 (OAC)| CloudFront["Amazon CloudFront CDN"]
     CloudFront -->|Sub-20ms Cached HTTPS GET| Client["Vercel Frontend / Web Clients"]
 ```
@@ -41,7 +41,6 @@ CloudFront maps `/` directly to `/level=mart/target=downstream/version=v1/`:
 | :--- | :--- | :--- | :--- |
 | **Manifest Index** | `manifest.json` | `https://<cdn>/manifest.json` | Root index listing all carparks, metadata, and generated timestamp |
 | **Individual Carpark** | `carparks/{id}_{lot_type}.json` | `https://<cdn>/carparks/ACB_C.json` | Full 7-day $\times$ 24-hour distribution stats for a single carpark lot type |
-| **Summary Bundle** | `summary/weekly_carpark_distributions.json.gz` | `https://<cdn>/summary/weekly_carpark_distributions.json.gz` | GZIP-compressed bundle containing all carparks for client bulk preloading |
 
 ---
 
