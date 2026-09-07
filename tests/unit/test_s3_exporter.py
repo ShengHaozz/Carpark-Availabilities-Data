@@ -110,7 +110,7 @@ def test_read_mart_csv_from_s3_without_header():
         "true",  # has_capacity_data
         "1.3012",  # location_latitude
         "103.8541",  # location_longitude
-        "2026-09-04T00:00:00Z",  # generated_at
+        "2026-09-04T08:00:00+08:00",  # generated_at
     ]
     csv_content = ",".join(raw_row) + "\n"
 
@@ -145,6 +145,7 @@ def test_read_mart_csv_from_s3_without_header():
     assert row["occupancy_median"] == 0.8400
     assert row["is_weekend"] is False
     assert row["has_capacity_data"] is True
+    assert row["generated_at"] == "2026-09-04T08:00:00+08:00"
 
 
 @patch("datamart.publisher.read_mart_csv_from_s3")

@@ -168,3 +168,19 @@ class TestDatamartInfraConfig:
             'INPUT_PREFIX     = "level=mart/target=publisher/mart_carpark_day_of_week_distribution"'
             in datamart_tf
         )
+
+    def test_gold_mart_emits_generated_at_as_singapore_iso8601_string(self):
+        """Hive output must retain the Singapore offset without a timestamp-with-zone column."""
+        mart_sql = (
+            Path(__file__).resolve().parent.parent.parent
+            / "packages"
+            / "gold"
+            / "models"
+            / "marts"
+            / "mart_carpark_day_of_week_distribution.sql"
+        ).read_text(encoding="utf-8")
+
+        assert (
+            "to_iso8601(current_timestamp at time zone 'Asia/Singapore') as generated_at"
+            in mart_sql
+        )

@@ -69,6 +69,6 @@ models:
         data_tests:
           - not_null
       - name: generated_at
-        description: "Timestamp when this mart aggregation table was generated."
+        description: "ISO 8601 timestamp with the Singapore (+08:00) offset when this mart aggregation table was generated."
         data_tests:
           - not_null

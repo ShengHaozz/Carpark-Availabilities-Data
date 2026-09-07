@@ -153,7 +153,7 @@ final_joined as (
         end as has_capacity_data,
         d.location_latitude,
         d.location_longitude,
-        current_timestamp as generated_at
+        to_iso8601(current_timestamp at time zone 'Asia/Singapore') as generated_at
     from hourly_aggregations h
     left join carpark_meta d
         on h.carpark_id = d.carpark_id
