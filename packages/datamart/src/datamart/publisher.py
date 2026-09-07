@@ -267,11 +267,7 @@ def publish_datamart_to_s3(
 
         manifest_carparks.extend(
             {
-                "carpark_id": doc.carpark.carpark_id,
-                "lot_type": doc.carpark.lot_type,
-                "agency": doc.carpark.agency,
-                "development": doc.carpark.development,
-                "has_capacity_data": doc.carpark.has_capacity_data,
+                "carpark": doc.carpark.to_dict(),
                 "file_path": f"carparks/{doc.carpark.carpark_id}_{doc.carpark.lot_type}.json",
             }
             for doc in documents

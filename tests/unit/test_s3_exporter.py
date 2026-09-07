@@ -1,6 +1,7 @@
 """Unit tests for datamart.publisher and datamart.handler modules."""
 
 import io
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -198,7 +199,7 @@ def test_read_mart_csv_from_s3_without_header():
 
 @patch("datamart.publisher.read_mart_csv_from_s3")
 def test_publish_datamart_to_s3(mock_read, caplog):
-    """Verifies complete datamart S3 export workflow including manifest and bundle."""
+    """Verifies complete datamart S3 export workflow including the manifest."""
     mock_read.return_value = [
         {
             "carpark_id": "ACB",
@@ -272,6 +273,20 @@ def test_publish_datamart_to_s3(mock_read, caplog):
     assert mock_read.call_count == 27
     assert mock_read.call_args_list[0].kwargs["prefix"].endswith("carpark_initial=A")
     assert "Published 1 documents for carpark_initial=A" in caplog.text
+
+    manifest_call = next(
+        call
+        for call in mock_s3.put_object.call_args_list
+        if call.kwargs["Key"].endswith("manifest.json")
+    )
+    manifest = json.loads(manifest_call.kwargs["Body"])
+    carpark_call = next(
+        call
+        for call in mock_s3.put_object.call_args_list
+        if "/carparks/" in call.kwargs["Key"]
+    )
+    carpark_document = json.loads(carpark_call.kwargs["Body"])
+    assert manifest["carparks"][0]["carpark"] == carpark_document["carpark"]
 
 
 @patch("datamart.handler.publish_datamart_to_s3")
