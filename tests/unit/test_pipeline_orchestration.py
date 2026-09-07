@@ -137,11 +137,11 @@ class TestDatamartInfraConfig:
         tf_text = (base_dir / "datamart_lambda.tf").read_text(encoding="utf-8")
         assert "aws_iam_role" in tf_text
         assert "lambda_role_datamart_publisher" in tf_text
-        assert "level=datamart/*" in tf_text
+        assert "level=mart/target=downstream/*" in tf_text
         assert "datamart_publisher_lambda" in tf_text
 
-    def test_gold_dbt_does_not_have_datamart_s3_permissions(self):
-        """Ensures gold_lambda is decoupled from datamart permissions."""
+    def test_gold_dbt_scoped_to_target_publisher_permissions(self):
+        """Ensures gold_lambda is scoped strictly to target=publisher and decoupled from downstream datamart."""
         gold_tf = (
             Path(__file__).resolve().parent.parent.parent
             / "infra"
@@ -150,4 +150,21 @@ class TestDatamartInfraConfig:
             / "gold_dbt.tf"
         )
         tf_text = gold_tf.read_text(encoding="utf-8")
-        assert "level=datamart/*" not in tf_text
+        assert "level=mart/target=publisher/*" in tf_text
+        assert "level=mart/target=downstream/*" not in tf_text
+
+    def test_gold_mart_writes_to_a_fixed_publisher_folder(self):
+        """The publisher must read the one deterministic folder dbt replaces each run."""
+        root_dir = Path(__file__).resolve().parent.parent.parent
+        project_text = (root_dir / "packages" / "gold" / "dbt_project.yml").read_text(
+            encoding="utf-8"
+        )
+        datamart_tf = (
+            root_dir / "infra" / "app" / "datamart_lambda" / "datamart_lambda.tf"
+        ).read_text(encoding="utf-8")
+
+        assert "+s3_data_naming: table" in project_text
+        assert (
+            'INPUT_PREFIX     = "level=mart/target=publisher/mart_carpark_day_of_week_distribution"'
+            in datamart_tf
+        )

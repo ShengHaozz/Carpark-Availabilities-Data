@@ -1,17 +1,15 @@
-"""S3 and Athena integration for querying Gold marts and publishing edge-ready JSON files."""
+"""S3 integration for directly reading CSV marts and publishing edge-ready JSON files."""
 
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import csv
 from datetime import datetime, timezone
+import gzip
 import io
 import json
 import logging
-import os
-import time
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
 
 import boto3
 
@@ -20,10 +18,58 @@ from datamart.exporter import (
     create_summary_bundle_gzip,
     dump_carpark_document_json,
 )
-from datamart.schema import DATAMART_API_VERSION
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+# Column names in physical order from mart_carpark_day_of_week_distribution model
+MART_COLUMNS = [
+    "distribution_id",
+    "carpark_id",
+    "lot_type",
+    "day_of_week",
+    "day_name",
+    "is_weekend",
+    "hour_of_day_sgt",
+    "observation_count",
+    "lots_avail_min",
+    "lots_avail_p10",
+    "lots_avail_p25",
+    "lots_avail_median",
+    "lots_avail_p75",
+    "lots_avail_p90",
+    "lots_avail_max",
+    "lots_avail_mean",
+    "lots_avail_stddev",
+    "lots_occ_min",
+    "lots_occ_p10",
+    "lots_occ_p25",
+    "lots_occ_median",
+    "lots_occ_p75",
+    "lots_occ_p90",
+    "lots_occ_max",
+    "lots_occ_mean",
+    "lots_occ_stddev",
+    "occupancy_min",
+    "occupancy_p10",
+    "occupancy_p25",
+    "occupancy_median",
+    "occupancy_p75",
+    "occupancy_p90",
+    "occupancy_max",
+    "occupancy_mean",
+    "occupancy_stddev",
+    "probability_full",
+    "probability_high_occupancy",
+    "development",
+    "area",
+    "agency",
+    "total_lots",
+    "has_capacity_data",
+    "location_latitude",
+    "location_longitude",
+    "generated_at",
+]
 
 # Numerical columns expected from mart_carpark_day_of_week_distribution
 FLOAT_COLUMNS = {
@@ -73,104 +119,84 @@ BOOL_COLUMNS = {
 }
 
 
-def _parse_s3_url(s3_url: str) -> tuple[str, str]:
-    """Extracts bucket and key prefix from an s3:// URI."""
-    parsed = urlparse(s3_url)
-    bucket = parsed.netloc
-    key = parsed.path.lstrip("/")
-    return bucket, key
+def parse_csv_row(row_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Casts raw CSV string values into typed dictionary fields."""
+    typed_row: Dict[str, Any] = {}
+    for col, val in row_dict.items():
+        if val is None or val == "" or str(val).lower() == "null":
+            typed_row[col] = None
+        elif col in FLOAT_COLUMNS:
+            try:
+                typed_row[col] = float(val)
+            except (ValueError, TypeError):
+                typed_row[col] = None
+        elif col in INT_COLUMNS:
+            try:
+                typed_row[col] = int(val)
+            except (ValueError, TypeError):
+                typed_row[col] = None
+        elif col in BOOL_COLUMNS:
+            typed_row[col] = str(val).lower() in ("true", "1", "t")
+        else:
+            typed_row[col] = val
+    return typed_row
 
 
-def run_athena_query(
-    query: str,
-    database: str,
-    s3_staging_dir: str,
-    workgroup: str = "primary",
-    athena_client: Optional[Any] = None,
-    poll_interval_sec: float = 2.0,
-    max_timeout_sec: float = 600.0,
-) -> str:
-    """Submits an Athena SQL query and blocks until completion."""
-    client = athena_client or boto3.client("athena")
-
-    logger.info(f"Submitting Athena query against database '{database}'...")
-    response = client.start_query_execution(
-        QueryString=query,
-        QueryExecutionContext={"Database": database},
-        ResultConfiguration={"OutputLocation": s3_staging_dir},
-        WorkGroup=workgroup,
-    )
-    query_execution_id = response["QueryExecutionId"]
-    logger.info(f"Athena query submitted. QueryExecutionId: {query_execution_id}")
-
-    start_time = time.time()
-    while True:
-        elapsed = time.time() - start_time
-        if elapsed > max_timeout_sec:
-            raise TimeoutError(
-                f"Athena query {query_execution_id} timed out after {max_timeout_sec}s."
-            )
-
-        status_response = client.get_query_execution(
-            QueryExecutionId=query_execution_id
-        )
-        state = status_response["QueryExecution"]["Status"]["State"]
-
-        if state == "SUCCEEDED":
-            logger.info(
-                f"Athena query {query_execution_id} completed successfully in {elapsed:.1f}s."
-            )
-            return query_execution_id
-        elif state in ("FAILED", "CANCELLED"):
-            reason = status_response["QueryExecution"]["Status"].get(
-                "StateChangeReason", "Unknown reason"
-            )
-            raise RuntimeError(f"Athena query {query_execution_id} {state}: {reason}")
-
-        time.sleep(poll_interval_sec)
-
-
-def fetch_query_results_from_s3(
-    query_execution_id: str,
-    s3_staging_dir: str,
+def read_mart_csv_from_s3(
+    s3_bucket: str,
+    prefix: str,
     s3_client: Optional[Any] = None,
 ) -> List[Dict[str, Any]]:
-    """Streams and parses the raw CSV output generated by Athena directly from S3."""
+    """Lists and streams CSV data files directly from S3 without Athena."""
     client = s3_client or boto3.client("s3")
-    staging_bucket, staging_prefix = _parse_s3_url(s3_staging_dir)
-    csv_key = f"{staging_prefix.rstrip('/')}/{query_execution_id}.csv"
+    list_prefix = f"{prefix}/"
 
-    logger.info(
-        f"Downloading Athena result CSV from s3://{staging_bucket}/{csv_key}..."
-    )
-    response = client.get_object(Bucket=staging_bucket, Key=csv_key)
-    csv_stream = io.StringIO(response["Body"].read().decode("utf-8"))
-
-    reader = csv.DictReader(csv_stream)
+    logger.info(f"Listing CSV files from s3://{s3_bucket}/{list_prefix}...")
+    paginator = client.get_paginator("list_objects_v2")
     records: List[Dict[str, Any]] = []
 
-    for row in reader:
-        typed_row: Dict[str, Any] = {}
-        for col, val in row.items():
-            if val is None or val == "" or val.lower() == "null":
-                typed_row[col] = None
-            elif col in FLOAT_COLUMNS:
-                try:
-                    typed_row[col] = float(val)
-                except ValueError:
-                    typed_row[col] = None
-            elif col in INT_COLUMNS:
-                try:
-                    typed_row[col] = int(val)
-                except ValueError:
-                    typed_row[col] = None
-            elif col in BOOL_COLUMNS:
-                typed_row[col] = val.lower() in ("true", "1", "t")
-            else:
-                typed_row[col] = val
-        records.append(typed_row)
+    for page in paginator.paginate(Bucket=s3_bucket, Prefix=list_prefix):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+            # Ignore directory markers, zero-size files, or Athena metadata
+            if key.endswith("/") or obj.get("Size", 0) == 0 or "$folder$" in key:
+                continue
 
-    logger.info(f"Loaded and type-cast {len(records)} rows from Athena CSV output.")
+            logger.info(f"Streaming mart data from s3://{s3_bucket}/{key}...")
+            response = client.get_object(Bucket=s3_bucket, Key=key)
+            body = response["Body"].read()
+
+            # Handle possible gzip compression
+            if key.endswith(".gz") or (len(body) >= 2 and body[:2] == b"\x1f\x8b"):
+                content = gzip.decompress(body).decode("utf-8")
+            else:
+                content = body.decode("utf-8")
+
+            csv_stream = io.StringIO(content)
+            first_line = csv_stream.readline()
+            if not first_line:
+                continue
+            csv_stream.seek(0)
+
+            # Detect whether header row is present
+            has_header = "carpark_id" in first_line
+
+            if has_header:
+                dict_reader = csv.DictReader(csv_stream)
+                for row_dict in dict_reader:
+                    records.append(parse_csv_row(row_dict))
+            else:
+                plain_reader = csv.reader(csv_stream)
+                for row in plain_reader:
+                    if not row or all(c == "" for c in row):
+                        continue
+                    row_dict = {
+                        MART_COLUMNS[i]: row[i]
+                        for i in range(min(len(row), len(MART_COLUMNS)))
+                    }
+                    records.append(parse_csv_row(row_dict))
+
+    logger.info(f"Loaded and type-cast {len(records)} total records from S3 mart CSVs.")
     return records
 
 
@@ -192,48 +218,27 @@ def _upload_single_carpark_json(
 
 def publish_datamart_to_s3(
     s3_bucket: str,
-    database: Optional[str] = None,
-    table_name: str = "mart_carpark_day_of_week_distribution",
-    version: str = DATAMART_API_VERSION,
-    s3_staging_dir: Optional[str] = None,
+    input_prefix: str,
+    output_prefix: str,
+    version: str,
     max_workers: int = 20,
     s3_client: Optional[Any] = None,
-    athena_client: Optional[Any] = None,
 ) -> Dict[str, Any]:
-    """Queries the Gold distribution mart from Athena and publishes JSON files and GZIP bundles to S3."""
+    """Directly reads CSV mart from S3 and publishes JSON files and GZIP bundles to S3."""
     client_s3 = s3_client or boto3.client("s3")
-    client_athena = athena_client or boto3.client("athena")
 
-    if database is None:
-        env = os.environ.get("ENV", "prod").lower()
-        database = f"{env}_marts" if env not in ("prod", "production") else "prod_marts"
-
-    if s3_staging_dir is None:
-        s3_staging_dir = f"s3://{s3_bucket}/athena-query-results/"
-
-    query = f"""
-    SELECT *
-    FROM {database}.{table_name}
-    ORDER BY carpark_id, lot_type, day_of_week, hour_of_day_sgt
-    """
-
-    logger.info(f"Starting datamart publication for database '{database}'...")
-    query_id = run_athena_query(
-        query=query,
-        database=database,
-        s3_staging_dir=s3_staging_dir,
-        athena_client=client_athena,
+    logger.info(
+        f"Starting datamart publication for s3://{s3_bucket}/{input_prefix} -> {output_prefix} (version={version})..."
     )
-
-    rows = fetch_query_results_from_s3(
-        query_execution_id=query_id,
-        s3_staging_dir=s3_staging_dir,
+    rows = read_mart_csv_from_s3(
+        s3_bucket=s3_bucket,
+        prefix=input_prefix,
         s3_client=client_s3,
     )
 
     if not rows:
         logger.warning(
-            f"No rows found in mart table '{database}.{table_name}'. Aborting export."
+            f"No rows found in S3 mart prefix '{input_prefix}'. Aborting export."
         )
         return {
             "status": "SKIPPED",
@@ -246,7 +251,7 @@ def publish_datamart_to_s3(
     total_carparks = len(documents)
     logger.info(f"Transformed {total_carparks} distinct carpark documents.")
 
-    prefix = f"level=datamart/version={version}"
+    prefix = f"{output_prefix}/version={version}"
     uploaded_count = 0
 
     # 1. Parallel upload of individual carpark JSON documents

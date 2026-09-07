@@ -24,7 +24,7 @@ flowchart TD
     subgraph Compute & Data Layer
         TaskSilver --> S3Silver["S3: /level=silver/"]
         TaskGold --> AthenaIceberg["Athena & Glue Catalog\n(gold.dim_carpark, gold.fct_lot_availability,\nmarts.mart_carpark_day_of_week_distribution)"]
-        TaskGold --> S3MartCSV["S3: /level=mart/target=publisher/\n(Daily CSV Mart)"]
+        TaskGold --> S3MartCSV["S3: /level=mart/target=publisher/mart_carpark_day_of_week_distribution/\n(Daily CSV Mart)"]
         TaskDatamart --> S3Datamart["S3: /level=mart/target=downstream/version=v1/\n(Edge JSON / CDN)"]
     end
     
@@ -67,7 +67,7 @@ flowchart TD
 
 ### 2.5 Analytical Mart: `mart_carpark_day_of_week_distribution`
 * **File**: [`models/marts/mart_carpark_day_of_week_distribution.sql`](models/marts/mart_carpark_day_of_week_distribution.sql)
-* **Materialization**: `table` (Hive Textfile / CSV format stored at `s3://<bucket>/level=mart/target=publisher/`, schema `marts`)
+* **Materialization**: `table` (Hive Textfile / CSV format stored at `s3://<bucket>/level=mart/target=publisher/mart_carpark_day_of_week_distribution/`; dbt replaces this fixed folder on each run; schema `marts`)
 * **Primary Key**: `distribution_id = to_hex(md5(to_utf8(concat(carpark_id, '|', lot_type, '|', cast(day_of_week as varchar), '|', cast(hour_of_day_sgt as varchar)))))`
 * **Lookback Window**: 60-day rolling observation window.
 * **Granularity**: 1-hour slot per day-of-week (`1=Monday` ... `7=Sunday`) per `(carpark_id, lot_type)`.

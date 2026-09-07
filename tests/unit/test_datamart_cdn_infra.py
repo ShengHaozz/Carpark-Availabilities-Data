@@ -34,7 +34,7 @@ def test_cloudfront_tf_exists_and_is_configured():
     assert "compress               = true" in content or "compress = true" in content
     assert "redirect-to-https" in content
     assert "origin_path" in content
-    assert "level=datamart/version=" in content
+    assert "level=mart/target=downstream/version=" in content
     assert "658327ea-f89d-4fab-a63d-7e88639e58f6" in content  # Managed-CachingOptimized
 
 
@@ -47,7 +47,7 @@ def test_s3_bucket_policy_has_oac_read_access():
 
     assert "AllowCloudFrontServicePrincipalReadOnly" in content
     assert "cloudfront.amazonaws.com" in content
-    assert "level=datamart/*" in content
+    assert "level=mart/target=downstream/*" in content
     assert "aws_cloudfront_distribution.datamart_cdn.arn" in content
 
 

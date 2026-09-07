@@ -7,7 +7,6 @@ import os
 from typing import Any, Dict
 
 from datamart.publisher import publish_datamart_to_s3
-from datamart.schema import DATAMART_API_VERSION
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -38,31 +37,54 @@ def handler(event: Dict[str, Any] | None = None, context: Any = None) -> Dict[st
             "S3_BUCKET environment variable or event parameter is required."
         )
 
-    database = (
-        event_dict.get("database")
-        or detail.get("database")
-        or os.environ.get("DATABASE")
+    input_prefix = (
+        event_dict.get("input_prefix")
+        or detail.get("input_prefix")
+        or os.environ.get("INPUT_PREFIX")
     )
-    table_name = (
-        event_dict.get("table_name")
-        or detail.get("table_name")
-        or os.environ.get("TABLE_NAME", "mart_carpark_day_of_week_distribution")
+    if not input_prefix:
+        logger.error(
+            "Missing required INPUT_PREFIX environment variable or event parameter."
+        )
+        raise ValueError(
+            "INPUT_PREFIX environment variable or event parameter is required."
+        )
+
+    output_prefix = (
+        event_dict.get("output_prefix")
+        or detail.get("output_prefix")
+        or os.environ.get("OUTPUT_PREFIX")
     )
+    if not output_prefix:
+        logger.error(
+            "Missing required OUTPUT_PREFIX environment variable or event parameter."
+        )
+        raise ValueError(
+            "OUTPUT_PREFIX environment variable or event parameter is required."
+        )
+
     version = (
         event_dict.get("version")
         or detail.get("version")
-        or os.environ.get("DATAMART_VERSION", DATAMART_API_VERSION)
+        or os.environ.get("DATAMART_VERSION")
     )
+    if not version:
+        logger.error(
+            "Missing required DATAMART_VERSION environment variable or event parameter."
+        )
+        raise ValueError(
+            "DATAMART_VERSION environment variable or event parameter is required."
+        )
 
     logger.info(
-        f"Publishing datamart for bucket='{s3_bucket}', database='{database}', "
-        f"table='{table_name}', version='{version}'"
+        f"Publishing datamart for bucket='{s3_bucket}', input_prefix='{input_prefix}', "
+        f"output_prefix='{output_prefix}', version='{version}'"
     )
 
     result = publish_datamart_to_s3(
         s3_bucket=s3_bucket,
-        database=database,
-        table_name=table_name,
+        input_prefix=input_prefix,
+        output_prefix=output_prefix,
         version=version,
     )
 

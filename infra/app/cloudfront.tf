@@ -54,7 +54,7 @@ resource "aws_cloudfront_distribution" "datamart_cdn" {
     domain_name              = aws_s3_bucket.bucket.bucket_regional_domain_name
     origin_id                = "S3-Carpark-Datamart"
     origin_access_control_id = aws_cloudfront_origin_access_control.datamart_oac.id
-    origin_path              = "/level=datamart/version=${var.datamart_version}"
+    origin_path              = "/level=mart/target=downstream/version=${var.datamart_version}"
   }
 
   default_cache_behavior {

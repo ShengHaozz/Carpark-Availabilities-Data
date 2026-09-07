@@ -114,7 +114,7 @@ data "aws_iam_policy_document" "datamart_s3_bucket_policy" {
     actions = ["s3:GetObject"]
 
     resources = [
-      "${aws_s3_bucket.bucket.arn}/level=datamart/*"
+      "${aws_s3_bucket.bucket.arn}/level=mart/target=downstream/*"
     ]
 
     condition {

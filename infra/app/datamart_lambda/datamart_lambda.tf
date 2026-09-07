@@ -30,7 +30,7 @@ resource "aws_iam_role_policy_attachment" "datamart_publisher_lambda_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# S3 Policy: Read Athena query results & Put datamart JSON documents
+# S3 Policy: Read CSV Marts & Put downstream JSON documents
 resource "aws_iam_role_policy" "datamart_s3_policy" {
   name = "datamart-publisher-s3-policy"
   role = aws_iam_role.lambda_role_datamart_publisher.name
@@ -50,13 +50,13 @@ resource "aws_iam_role_policy" "datamart_s3_policy" {
         ]
       },
       {
-        Sid    = "ReadAthenaQueryResults"
+        Sid    = "ReadMartCsv"
         Effect = "Allow"
         Action = [
           "s3:GetObject"
         ]
         Resource = [
-          "${var.s3_bucket.arn}/athena-query-results/*"
+          "${var.s3_bucket.arn}/level=mart/target=publisher/*"
         ]
       },
       {
@@ -69,77 +69,7 @@ resource "aws_iam_role_policy" "datamart_s3_policy" {
           "s3:ListMultipartUploadParts"
         ]
         Resource = [
-          "${var.s3_bucket.arn}/level=datamart/*",
-          "${var.s3_bucket.arn}/athena-query-results/*"
-        ]
-      }
-    ]
-  })
-}
-
-# Athena Query Execution Policy (Scoped to primary workgroup)
-resource "aws_iam_role_policy" "datamart_athena_policy" {
-  name = "datamart-publisher-athena-policy"
-  role = aws_iam_role.lambda_role_datamart_publisher.name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AthenaWorkgroupExecution"
-        Effect = "Allow"
-        Action = [
-          "athena:StartQueryExecution",
-          "athena:GetQueryExecution",
-          "athena:GetQueryResults",
-          "athena:StopQueryExecution",
-          "athena:GetWorkGroup"
-        ]
-        Resource = [
-          "arn:aws:athena:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workgroup/primary"
-        ]
-      },
-      {
-        Sid    = "AthenaGlobalDiscovery"
-        Effect = "Allow"
-        Action = [
-          "athena:GetDataCatalog",
-          "athena:GetDatabase",
-          "athena:GetTableMetadata",
-          "athena:ListWorkGroups"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-# Glue Data Catalog Read-Only Policy for Gold Marts
-resource "aws_iam_role_policy" "datamart_glue_policy" {
-  name = "datamart-publisher-glue-policy"
-  role = aws_iam_role.lambda_role_datamart_publisher.name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "GlueCatalogAndMartsRead"
-        Effect = "Allow"
-        Action = [
-          "glue:GetDatabases",
-          "glue:GetDatabase",
-          "glue:GetTable",
-          "glue:GetTables",
-          "glue:GetTableVersion",
-          "glue:GetTableVersions",
-          "glue:GetPartition",
-          "glue:GetPartitions",
-          "glue:BatchGetPartition"
-        ]
-        Resource = [
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/prod_*",
-          "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/prod_*/*"
+          "${var.s3_bucket.arn}/level=mart/target=downstream/*"
         ]
       }
     ]
@@ -164,8 +94,8 @@ resource "aws_lambda_function" "datamart_publisher_lambda" {
     variables = {
       ENV              = "prod"
       S3_BUCKET        = var.s3_bucket.id
-      DATABASE         = "prod_marts"
-      TABLE_NAME       = "mart_carpark_day_of_week_distribution"
+      INPUT_PREFIX     = "level=mart/target=publisher/mart_carpark_day_of_week_distribution"
+      OUTPUT_PREFIX    = "level=mart/target=downstream"
       DATAMART_VERSION = "v1"
     }
   }
