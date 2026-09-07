@@ -2,7 +2,6 @@
     materialized='table',
     table_type='hive',
     format='textfile',
-    field_delimiter=',',
     s3_data_dir='s3://' ~ env_var('S3_BUCKET') ~ '/level=mart/target=publisher/',
     schema='marts'
 ) }}

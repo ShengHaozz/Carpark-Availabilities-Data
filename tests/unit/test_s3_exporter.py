@@ -13,12 +13,59 @@ from datamart.publisher import (
 
 
 def test_read_mart_csv_from_s3_with_header():
-    """Verifies reading and type casting of CSV results from S3 with header row."""
+    """Verifies reading and type casting of delimited results with a header row."""
+    delimiter = "\x01"
     csv_content = (
-        "carpark_id,lot_type,day_of_week,hour_of_day_sgt,observation_count,"
-        "lots_avail_min,lots_avail_median,occupancy_median,is_weekend,has_capacity_data,agency\n"
-        "ACB,C,1,8,60,10.0,80.0,0.8400,false,true,HDB\n"
-        "SUNTEC,C,1,12,60,50.0,450.0,,false,false,LTA\n"
+        "\n".join(
+            (
+                delimiter.join(
+                    [
+                        "carpark_id",
+                        "lot_type",
+                        "day_of_week",
+                        "hour_of_day_sgt",
+                        "observation_count",
+                        "lots_avail_min",
+                        "lots_avail_median",
+                        "occupancy_median",
+                        "is_weekend",
+                        "has_capacity_data",
+                        "agency",
+                    ]
+                ),
+                delimiter.join(
+                    [
+                        "ACB",
+                        "C",
+                        "1",
+                        "8",
+                        "60",
+                        "10.0",
+                        "80.0",
+                        "0.8400",
+                        "false",
+                        "true",
+                        "HDB",
+                    ]
+                ),
+                delimiter.join(
+                    [
+                        "SUNTEC",
+                        "C",
+                        "1",
+                        "12",
+                        "60",
+                        "50.0",
+                        "450.0",
+                        "",
+                        "false",
+                        "false",
+                        "LTA",
+                    ]
+                ),
+            )
+        )
+        + "\n"
     )
 
     mock_s3 = MagicMock()
@@ -63,7 +110,7 @@ def test_read_mart_csv_from_s3_with_header():
 
 
 def test_read_mart_csv_from_s3_without_header():
-    """Verifies reading of raw CSV results mapped by physical column order."""
+    """Verifies delimiter-safe raw mart rows preserve commas in metadata."""
     # 45 columns matching MART_COLUMNS
     raw_row = [
         "dist-123",  # distribution_id
@@ -103,7 +150,7 @@ def test_read_mart_csv_from_s3_without_header():
         "0.0642",  # occupancy_stddev
         "0.0",  # probability_full
         "0.35",  # probability_high_occupancy
-        "Albert Centre",  # development
+        "Albert Centre, Block 1",  # development
         "Central",  # area
         "HDB",  # agency
         "500",  # total_lots
@@ -112,7 +159,7 @@ def test_read_mart_csv_from_s3_without_header():
         "103.8541",  # location_longitude
         "2026-09-04T08:00:00+08:00",  # generated_at
     ]
-    csv_content = ",".join(raw_row) + "\n"
+    csv_content = "\x01".join(raw_row) + "\n"
 
     mock_s3 = MagicMock()
     mock_paginator = MagicMock()
@@ -145,6 +192,7 @@ def test_read_mart_csv_from_s3_without_header():
     assert row["occupancy_median"] == 0.8400
     assert row["is_weekend"] is False
     assert row["has_capacity_data"] is True
+    assert row["development"] == "Albert Centre, Block 1"
     assert row["generated_at"] == "2026-09-04T08:00:00+08:00"
 
 

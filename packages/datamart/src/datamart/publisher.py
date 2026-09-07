@@ -1,4 +1,4 @@
-"""S3 integration for directly reading CSV marts and publishing edge-ready JSON files."""
+"""S3 integration for directly reading delimited marts and publishing edge-ready JSON files."""
 
 from __future__ import annotations
 
@@ -118,6 +118,10 @@ BOOL_COLUMNS = {
     "has_capacity_data",
 }
 
+# Hive TEXTFILE does not CSV-quote values, so commas in carpark metadata would
+# otherwise shift columns. This must match the dbt `field_delimiter` setting.
+MART_FIELD_DELIMITER = "\x01"
+
 
 def parse_csv_row(row_dict: Dict[str, Any]) -> Dict[str, Any]:
     """Casts raw CSV string values into typed dictionary fields."""
@@ -182,11 +186,11 @@ def read_mart_csv_from_s3(
             has_header = "carpark_id" in first_line
 
             if has_header:
-                dict_reader = csv.DictReader(csv_stream)
+                dict_reader = csv.DictReader(csv_stream, delimiter=MART_FIELD_DELIMITER)
                 for row_dict in dict_reader:
                     records.append(parse_csv_row(row_dict))
             else:
-                plain_reader = csv.reader(csv_stream)
+                plain_reader = csv.reader(csv_stream, delimiter=MART_FIELD_DELIMITER)
                 for row in plain_reader:
                     if not row or all(c == "" for c in row):
                         continue

@@ -169,6 +169,24 @@ class TestDatamartInfraConfig:
             in datamart_tf
         )
 
+    def test_gold_mart_uses_a_delimiter_safe_for_metadata_commas(self):
+        """Hive TEXTFILE must not use commas because metadata values contain them."""
+        root_dir = Path(__file__).resolve().parent.parent.parent
+        project_text = (root_dir / "packages" / "gold" / "dbt_project.yml").read_text(
+            encoding="utf-8"
+        )
+        mart_sql = (
+            root_dir
+            / "packages"
+            / "gold"
+            / "models"
+            / "marts"
+            / "mart_carpark_day_of_week_distribution.sql"
+        ).read_text(encoding="utf-8")
+
+        assert '+field_delimiter: "\\u0001"' in project_text
+        assert "field_delimiter=" not in mart_sql
+
     def test_gold_mart_emits_generated_at_as_singapore_iso8601_string(self):
         """Hive output must retain the Singapore offset without a timestamp-with-zone column."""
         mart_sql = (
